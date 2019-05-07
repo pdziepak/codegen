@@ -29,10 +29,12 @@
 
 #include <llvm/Support/TargetSelect.h>
 
+#include "codegen/module.hpp"
+
 namespace codegen {
 
 compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
-    : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())), mangle_(session_, data_layout_),
+    : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())),
       object_layer_(
           session_, [] { return std::make_unique<llvm::SectionMemoryManager>(); },
           [this](llvm::orc::VModuleKey vk, llvm::object::ObjectFile const& object,
@@ -49,7 +51,7 @@ compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
 compiler::compiler()
     : compiler([] {
         llvm::InitializeNativeTarget();
-        llvm::InitializeNativeTarget();
+        llvm::InitializeNativeTargetAsmPrinter();
 
         auto tmb = unwrap(llvm::orc::JITTargetMachineBuilder::detectHost());
         tmb.setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
@@ -61,6 +63,14 @@ compiler::compiler()
 llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc::ThreadSafeModule module,
                                                                       llvm::orc::MaterializationResponsibility const&) {
   return module;
+}
+
+module::module(llvm::orc::ExecutionSession& session, llvm::DataLayout dl) : session_(&session), mangle_(session, dl) {
+}
+
+void* module::get_address(std::string const& name) {
+  auto address = unwrap(session_->lookup({&session_->getMainJITDylib()}, mangle_(name))).getAddress();
+  return reinterpret_cast<void*>(address);
 }
 
 } // namespace codegen

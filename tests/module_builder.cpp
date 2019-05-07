@@ -32,3 +32,14 @@ TEST(module_builder, empty) {
   auto module = std::move(builder).build();
   (void)module;
 }
+
+TEST(module_builder, return_void) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "return_void");
+  auto fn = builder.create_function<void()>("return_void_fn", [] {
+    codegen::return_();
+  });
+  auto module = std::move(builder).build();
+  auto fn_ptr = module.get_address(fn);
+  fn_ptr();
+}

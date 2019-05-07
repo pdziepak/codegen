@@ -24,17 +24,28 @@
 
 namespace codegen {
 
+template<typename ReturnType, typename... Arguments> class function_ref;
+
 class module {
   llvm::orc::ExecutionSession* session_;
 
+  llvm::orc::MangleAndInterner mangle_;
+
 private:
-  explicit module(llvm::orc::ExecutionSession& session) : session_(&session) {}
+  module(llvm::orc::ExecutionSession&, llvm::DataLayout);
+
+  void* get_address(std::string const&);
 
   friend class module_builder;
 
 public:
   module(module const&) = delete;
   module(module&&) = delete;
+
+  template<typename ReturnType, typename... Arguments>
+  auto get_address(function_ref<ReturnType, Arguments...> const& fn) {
+    return reinterpret_cast<ReturnType (*)(Arguments...)>(get_address(fn.name()));
+  }
 };
 
 } // namespace codegen

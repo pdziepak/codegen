@@ -39,8 +39,6 @@ class compiler {
 
   llvm::DataLayout data_layout_;
 
-  llvm::orc::MangleAndInterner mangle_;
-
   llvm::orc::RTDyldObjectLinkingLayer object_layer_;
   llvm::orc::IRCompileLayer compile_layer_;
   llvm::orc::IRTransformLayer optimize_layer_;

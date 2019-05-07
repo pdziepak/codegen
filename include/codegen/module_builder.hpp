@@ -34,9 +34,20 @@ namespace codegen {
 class compiler;
 class module;
 
+template<typename ReturnType, typename... Arguments> class function_ref {
+  std::string name_;
+  llvm::Function* function_;
+
+public:
+  explicit function_ref(std::string const& name, llvm::Function* fn) : name_(name), function_(fn) {}
+
+  std::string const& name() const { return name_; }
+};
+
 class module_builder {
   compiler* compiler_;
 
+public: // FIXME: proper encapsulation
   std::unique_ptr<llvm::LLVMContext> context_;
   std::unique_ptr<llvm::Module> module_;
 
@@ -49,7 +60,88 @@ public:
   module_builder(module_builder const&) = delete;
   module_builder(module_builder&&) = delete;
 
+  template<typename FunctionType, typename FunctionBuilder>
+  auto create_function(std::string const& name, FunctionBuilder&& fb);
+
   [[nodiscard]] module build() &&;
+
+  friend std::ostream& operator<<(std::ostream&, module_builder const&);
 };
+
+namespace detail {
+
+inline thread_local module_builder* current_builder;
+
+template<typename Type> struct type {
+  static llvm::DIType* dbg();
+  static llvm::Type* llvm();
+  static std::string name();
+};
+template<> struct type<void> {
+  static constexpr size_t alignment = 0;
+  static llvm::DIType* dbg() { return nullptr; }
+  static llvm::Type* llvm() { return llvm::Type::getVoidTy(*current_builder->context_); }
+  static std::string name() { return "void"; }
+};
+
+} // namespace detail
+
+template<typename Type> class value {
+  llvm::Value* value_;
+  std::string name_;
+
+public:
+  explicit value(llvm::Value* v, std::string const& n) : value_(v), name_(n) {}
+
+  using value_type = Type;
+
+  operator llvm::Value*() const noexcept { return value_; }
+};
+
+
+void return_();
+
+namespace detail {
+
+template<typename> class function_builder;
+
+template<typename ReturnType, typename... Arguments> class function_builder<ReturnType(Arguments...)> {
+  template<typename Argument> void prepare_argument(llvm::Function::arg_iterator args, size_t idx) {
+    auto it = args + idx;
+    auto name = "arg" + std::to_string(idx);
+    it->setName(name);
+  }
+
+  template<size_t... Idx, typename FunctionBuilder>
+  void call_builder(std::index_sequence<Idx...>, std::string const&, FunctionBuilder&& fb,
+                    llvm::Function::arg_iterator args) {
+    [[maybe_unused]] auto _ = {0, (prepare_argument<Arguments>(args, Idx), 0)...};
+    fb(value<Arguments>(&*(args + Idx), "arg" + std::to_string(Idx))...);
+  }
+
+public:
+  template<typename FunctionBuilder>
+  function_ref<ReturnType, Arguments...> operator()(std::string const& name, FunctionBuilder&& fb) {
+    auto& mb = *current_builder;
+    auto fn_type = llvm::FunctionType::get(type<ReturnType>::llvm(), {type<Arguments>::llvm()...}, false);
+    auto fn = llvm::Function::Create(fn_type, llvm::GlobalValue::LinkageTypes::ExternalLinkage, name, mb.module_.get());
+
+    auto block = llvm::BasicBlock::Create(*mb.context_, "entry", fn);
+    mb.ir_builder_.SetInsertPoint(block);
+
+    call_builder(std::index_sequence_for<Arguments...>{}, name, fb, fn->arg_begin());
+
+    return function_ref<ReturnType, Arguments...>{name, fn};
+  }
+};
+
+} // namespace detail
+
+template<typename FunctionType, typename FunctionBuilder>
+auto module_builder::create_function(std::string const& name, FunctionBuilder&& fb) {
+  assert(detail::current_builder == this || !detail::current_builder);
+  detail::current_builder = this;
+  return detail::function_builder<FunctionType>{}(name, fb);
+}
 
 } // namespace codegen

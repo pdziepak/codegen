@@ -22,6 +22,8 @@
 
 #include "codegen/module_builder.hpp"
 
+#include <llvm/Support/raw_os_ostream.h>
+
 #include "codegen/compiler.hpp"
 #include "codegen/module.hpp"
 
@@ -35,7 +37,17 @@ module_builder::module_builder(compiler& c, std::string const& name)
 module module_builder::build() && {
   throw_on_error(compiler_->optimize_layer_.add(compiler_->session_.getMainJITDylib(),
                                                 llvm::orc::ThreadSafeModule(std::move(module_), std::move(context_))));
-  return module{compiler_->session_};
+  return module{compiler_->session_, compiler_->data_layout_};
+}
+
+std::ostream& operator<<(std::ostream& os, module_builder const& mb) {
+  auto llvm_os = llvm::raw_os_ostream(os);
+  mb.module_->print(llvm_os, nullptr);
+  return os;
+}
+
+void return_() {
+  detail::current_builder->ir_builder_.CreateRetVoid();
 }
 
 } // namespace codegen
