@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <filesystem>
+
 #include <llvm/ExecutionEngine/JITEventListener.h>
 
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -45,12 +47,15 @@ class compiler {
 
   llvm::JITEventListener* gdb_listener_;
 
+  std::filesystem::path source_directory_;
+
   friend class module_builder;
 private:
   explicit compiler(llvm::orc::JITTargetMachineBuilder);
 
 public:
   compiler();
+  ~compiler();
 
   compiler(compiler const&) = delete;
   compiler(compiler&&) = delete;

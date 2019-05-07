@@ -22,6 +22,9 @@
 
 #include "codegen/compiler.hpp"
 
+#include <fstream>
+#include <random>
+
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -33,6 +36,13 @@
 
 namespace codegen {
 
+static std::string get_process_name() {
+  auto ifs = std::ifstream("/proc/self/comm");
+  auto str = std::string{};
+  std::getline(ifs, str);
+  return str;
+}
+
 compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
     : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())),
       object_layer_(
@@ -43,9 +53,15 @@ compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
           }),
       compile_layer_(session_, object_layer_, llvm::orc::ConcurrentIRCompiler(std::move(tmb))),
       optimize_layer_(session_, compile_layer_, optimize_module),
-      gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()) {
+      gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()), source_directory_([&] {
+        auto eng = std::default_random_engine{std::random_device{}()};
+        auto dist = std::uniform_int_distribution<uint64_t>{};
+        return std::filesystem::temp_directory_path() / (get_process_name() + "-" + std::to_string(dist(eng)));
+      }()) {
   auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(data_layout_);
   session_.getMainJITDylib().setGenerator(*gen);
+
+  std::filesystem::create_directories(source_directory_);
 }
 
 compiler::compiler()
@@ -60,12 +76,17 @@ compiler::compiler()
       }()) {
 }
 
+compiler::~compiler() {
+  std::filesystem::remove_all(source_directory_);
+}
+
 llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc::ThreadSafeModule module,
                                                                       llvm::orc::MaterializationResponsibility const&) {
   return module;
 }
 
-module::module(llvm::orc::ExecutionSession& session, llvm::DataLayout dl) : session_(&session), mangle_(session, dl) {
+module::module(llvm::orc::ExecutionSession& session, llvm::DataLayout const& dl)
+    : session_(&session), mangle_(session, dl) {
 }
 
 void* module::get_address(std::string const& name) {

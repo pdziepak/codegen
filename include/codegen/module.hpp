@@ -32,7 +32,7 @@ class module {
   llvm::orc::MangleAndInterner mangle_;
 
 private:
-  module(llvm::orc::ExecutionSession&, llvm::DataLayout);
+  module(llvm::orc::ExecutionSession&, llvm::DataLayout const&);
 
   void* get_address(std::string const&);
 
