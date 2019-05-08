@@ -31,6 +31,9 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 namespace codegen {
 
 class compiler;
@@ -104,6 +107,20 @@ template<> struct type<void> {
   static llvm::Type* llvm() { return llvm::Type::getVoidTy(*current_builder->context_); }
   static std::string name() { return "void"; }
 };
+template<> struct type<int32_t> {
+  static constexpr size_t alignment = alignof(int32_t);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 32, llvm::dwarf::DW_ATE_signed);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getInt32Ty(*current_builder->context_); }
+  static std::string name() { return "i32"; }
+};
+
+template<typename Type> llvm::Value* get_constant(Type);
+
+template<> inline llvm::Value* get_constant<int32_t>(int32_t v) {
+  return llvm::ConstantInt::get(*current_builder->context_, llvm::APInt(32, v, true));
+}
 
 } // namespace detail
 
@@ -117,9 +134,30 @@ public:
   using value_type = Type;
 
   operator llvm::Value*() const noexcept { return value_; }
+
+  friend std::ostream& operator<<(std::ostream& os, value v) { return os << v.name_; }
 };
 
+template<typename Type> value<Type> constant(Type v) {
+  return value<Type>{detail::get_constant<Type>(v), std::to_string(v)};
+}
+
+namespace detail {
+
+template<typename Type> llvm::Value* eval(value<Type> v) {
+  return v;
+}
+
+} // namespace detail
+
 void return_();
+
+template<typename Value> void return_(Value v) {
+  auto& mb = *detail::current_builder;
+  auto line_no = mb.source_code_.add_line(fmt::format("return {};", v));
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+  mb.ir_builder_.CreateRet(detail::eval(v));
+}
 
 namespace detail {
 
@@ -139,7 +177,8 @@ template<typename ReturnType, typename... Arguments> class function_builder<Retu
 
     auto str = std::stringstream{};
     str << type<ReturnType>::name() << " " << name << "(";
-    (void)(str << ... << (type<Arguments>::name() + " arg" + Idx + (Idx + 1 == sizeof...(Idx) ? "" : ", ")));
+    (void)(str << ...
+               << (type<Arguments>::name() + " arg" + std::to_string(Idx) + (Idx + 1 == sizeof...(Idx) ? "" : ", ")));
     str << ") {";
     mb.source_code_.add_line(str.str());
     mb.source_code_.enter_scope();
@@ -161,8 +200,8 @@ public:
     std::vector<llvm::Metadata*> dbg_types = {detail::type<ReturnType>::dbg(), detail::type<Arguments>::dbg()...};
     auto dbg_fn_type = mb.dbg_builder_.createSubroutineType(mb.dbg_builder_.getOrCreateTypeArray(dbg_types));
     auto dbg_fn_scope = mb.dbg_builder_.createFunction(
-        mb.dbg_scope_, name, name, mb.dbg_file_, mb.source_code_.current_line(), dbg_fn_type, 0,
-        llvm::DINode::FlagPrototyped,
+        mb.dbg_scope_, name, name, mb.dbg_file_, mb.source_code_.current_line(), dbg_fn_type,
+        mb.source_code_.current_line(), llvm::DINode::FlagPrototyped,
         llvm::DISubprogram::DISPFlags::SPFlagDefinition | llvm::DISubprogram::DISPFlags::SPFlagOptimized);
     auto parent_scope = std::exchange(mb.dbg_scope_, dbg_fn_scope);
     fn->setSubprogram(dbg_fn_scope);
@@ -185,8 +224,10 @@ public:
 template<typename FunctionType, typename FunctionBuilder>
 auto module_builder::create_function(std::string const& name, FunctionBuilder&& fb) {
   assert(detail::current_builder == this || !detail::current_builder);
-  detail::current_builder = this;
-  return detail::function_builder<FunctionType>{}(name, fb);
+  auto prev_builder = std::exchange(detail::current_builder, this);
+  auto fn_ref = detail::function_builder<FunctionType>{}(name, fb);
+  detail::current_builder = prev_builder;
+  return fn_ref;
 }
 
 } // namespace codegen

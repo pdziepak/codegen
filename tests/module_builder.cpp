@@ -36,10 +36,29 @@ TEST(module_builder, empty) {
 TEST(module_builder, return_void) {
   auto comp = codegen::compiler{};
   auto builder = codegen::module_builder(comp, "return_void");
-  auto fn = builder.create_function<void()>("return_void_fn", [] {
-    codegen::return_();
-  });
+  auto fn = builder.create_function<void()>("return_void_fn", [] { codegen::return_(); });
   auto module = std::move(builder).build();
   auto fn_ptr = module.get_address(fn);
   fn_ptr();
+}
+
+TEST(module_builder, return_i32) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "return_i32");
+
+  auto return_constant =
+      builder.create_function<int32_t()>("return_constant", [] { codegen::return_(codegen::constant<int32_t>(4)); });
+
+  auto return_argument = builder.create_function<int32_t(int32_t)>(
+      "return_argument", [](codegen::value<int32_t> arg) { codegen::return_(arg); });
+
+  auto module = std::move(builder).build();
+
+  auto return_constant_ptr = module.get_address(return_constant);
+  EXPECT_EQ(return_constant_ptr(), 4);
+
+  auto return_argument_ptr = module.get_address(return_argument);
+  EXPECT_EQ(return_argument_ptr(1), 1);
+  EXPECT_EQ(return_argument_ptr(8), 8);
+  EXPECT_EQ(return_argument_ptr(-7), -7);
 }
