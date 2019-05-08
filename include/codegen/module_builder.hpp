@@ -107,6 +107,14 @@ template<> struct type<void> {
   static llvm::Type* llvm() { return llvm::Type::getVoidTy(*current_builder->context_); }
   static std::string name() { return "void"; }
 };
+template<> struct type<bool> {
+  static constexpr size_t alignment = alignof(bool);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 8, llvm::dwarf::DW_ATE_boolean);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getInt1Ty(*current_builder->context_); }
+  static std::string name() { return "bool"; }
+};
 template<> struct type<int32_t> {
   static constexpr size_t alignment = alignof(int32_t);
   static llvm::DIType* dbg() {
@@ -118,6 +126,9 @@ template<> struct type<int32_t> {
 
 template<typename Type> llvm::Value* get_constant(Type);
 
+template<> inline llvm::Value* get_constant<bool>(bool v) {
+  return llvm::ConstantInt::get(*current_builder->context_, llvm::APInt(1, v, true));
+}
 template<> inline llvm::Value* get_constant<int32_t>(int32_t v) {
   return llvm::ConstantInt::get(*current_builder->context_, llvm::APInt(32, v, true));
 }
