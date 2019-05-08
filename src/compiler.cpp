@@ -32,6 +32,9 @@
 
 #include <llvm/Support/TargetSelect.h>
 
+#include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+
 #include "codegen/module.hpp"
 
 namespace codegen {
@@ -78,14 +81,32 @@ compiler::compiler()
 }
 
 compiler::~compiler() {
-  for (auto vk : loaded_modules_) {
-    gdb_listener_->notifyFreeingObject(vk);
-  }
+  for (auto vk : loaded_modules_) { gdb_listener_->notifyFreeingObject(vk); }
   std::filesystem::remove_all(source_directory_);
 }
 
 llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc::ThreadSafeModule module,
                                                                       llvm::orc::MaterializationResponsibility const&) {
+  auto function_passes = llvm::legacy::FunctionPassManager(module.getModule());
+  auto module_passes = llvm::legacy::PassManager();
+
+  auto builder = llvm::PassManagerBuilder{};
+  builder.OptLevel = 3;
+  builder.PrepareForLTO = true;
+  builder.Inliner = llvm::createFunctionInliningPass();
+  builder.MergeFunctions = true;
+  builder.LoopVectorize = true;
+  builder.SLPVectorize = true;
+
+  builder.populateFunctionPassManager(function_passes);
+  builder.populateModulePassManager(module_passes);
+
+  function_passes.doInitialization();
+  for (auto& func : *module.getModule()) { function_passes.run(func); }
+  function_passes.doFinalization();
+
+  module_passes.run(*module.getModule());
+
   return module;
 }
 
