@@ -129,4 +129,44 @@ void store(Value v, Pointer ptr) {
   mb.ir_builder_.CreateAlignedStore(v.eval(), ptr.eval(), detail::type<value_type>::alignment);
 }
 
+template<typename ConditionFn, typename Body,
+         typename = std::enable_if_t<std::is_same_v<typename std::invoke_result_t<ConditionFn>::value_type, bool>>>
+void while_(ConditionFn cnd_fn, Body bdy) {
+  auto& mb = *detail::current_builder;
+
+  auto line_no = mb.source_code_.current_line() + 1;
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+  auto cnd = cnd_fn();
+  mb.source_code_.add_line(fmt::format("while ({}) {{", cnd));
+
+  auto while_continue = llvm::BasicBlock::Create(*mb.context_, "while_continue", mb.function_);
+  auto while_iteration = llvm::BasicBlock::Create(*mb.context_, "while_iteration");
+  auto while_break = llvm::BasicBlock::Create(*mb.context_, "while_break");
+
+  mb.ir_builder_.CreateBr(while_continue);
+  mb.ir_builder_.SetInsertPoint(while_continue);
+
+  mb.ir_builder_.CreateCondBr(cnd_fn().eval(), while_iteration, while_break);
+
+  mb.source_code_.enter_scope();
+
+  auto scope = mb.dbg_builder_.createLexicalBlock(mb.dbg_scope_, mb.dbg_file_, mb.source_code_.current_line(), 1);
+  auto parent_scope = std::exchange(mb.dbg_scope_, scope);
+
+  mb.function_->getBasicBlockList().push_back(while_iteration);
+  mb.ir_builder_.SetInsertPoint(while_iteration);
+  bdy();
+
+  mb.dbg_scope_ = parent_scope;
+
+  mb.source_code_.leave_scope();
+  line_no = mb.source_code_.add_line("}");
+
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+  mb.ir_builder_.CreateBr(while_continue);
+
+  mb.function_->getBasicBlockList().push_back(while_break);
+  mb.ir_builder_.SetInsertPoint(while_break);
+}
+
 } // namespace codegen

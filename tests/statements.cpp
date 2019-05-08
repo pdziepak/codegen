@@ -135,3 +135,29 @@ TEST(statements, store) {
   store_ptr(-8, &pointer);
   EXPECT_EQ(value, -4);
 }
+
+TEST(statements, while_loop) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "while_loop");
+
+  auto fact = builder.create_function<int32_t(int32_t)>("fact", [&](codegen::value<int32_t> x) {
+    auto value = codegen::variable<int32_t>("value");
+    auto next = codegen::variable<int32_t>("next");
+
+    value.set(codegen::constant<int32_t>(1));
+    next.set(x);
+
+    codegen::while_([&] { return next.get() != codegen::constant<int32_t>(1); },
+                    [&] {
+                      value.set(value.get() * next.get());
+                      next.set(next.get() - codegen::constant<int32_t>(1));
+                    });
+    codegen::return_(value.get());
+  });
+
+  auto module = std::move(builder).build();
+
+  auto fact_ptr = module.get_address(fact);
+  EXPECT_EQ(fact_ptr(4), 24);
+  EXPECT_EQ(fact_ptr(6), 720);
+}
