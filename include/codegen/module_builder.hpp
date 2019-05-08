@@ -58,6 +58,8 @@ public: // FIXME: proper encapsulation
 
   llvm::IRBuilder<> ir_builder_;
 
+  llvm::Function* function_{};
+
   class source_code_generator {
     std::stringstream source_code_;
     unsigned line_no_ = 1;
@@ -224,6 +226,7 @@ public:
     auto block = llvm::BasicBlock::Create(*mb.context_, "entry", fn);
     mb.ir_builder_.SetInsertPoint(block);
 
+    mb.function_ = fn;
     call_builder(std::index_sequence_for<Arguments...>{}, name, fb, fn->arg_begin());
 
     mb.dbg_scope_ = parent_scope;
