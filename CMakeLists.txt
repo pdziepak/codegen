@@ -41,6 +41,7 @@ else()
 endif()
 
 find_package(LLVM 8 REQUIRED)
+find_package(fmt REQUIRED)
 
 add_library(codegen
   src/compiler.cpp
@@ -50,7 +51,7 @@ target_include_directories(codegen PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOUR
 target_compile_features(codegen PUBLIC cxx_std_17)
 target_link_options(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
 target_compile_options(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
-target_link_libraries(codegen PUBLIC LLVM)
+target_link_libraries(codegen PUBLIC LLVM fmt)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)
