@@ -46,6 +46,8 @@ template<typename ReturnType, typename... Arguments> class function_ref {
 public:
   explicit function_ref(std::string const& name, llvm::Function* fn) : name_(name), function_(fn) {}
 
+  operator llvm::Function*() const { return function_; }
+
   std::string const& name() const { return name_; }
 };
 

@@ -74,4 +74,25 @@ void if_(Condition&& cnd, TrueBlock&& tb, FalseBlock&& fb) {
   mb.ir_builder_.SetInsertPoint(merge_block);
 }
 
+template<typename ReturnType, typename... Arguments, typename... Values>
+value<ReturnType> call(function_ref<ReturnType, Arguments...> const& fn, Values&&... args) {
+  static_assert((std::is_same_v<Arguments, typename std::decay_t<Values>::value_type> && ...));
+
+  auto& mb = *detail::current_builder;
+
+  auto str = std::stringstream{};
+  str << fn.name() << "_ret = " << fn.name() << "(";
+  (void)(str << ... << fmt::format("{}, ", args));
+  str << ");";
+  auto line_no = mb.source_code_.add_line(str.str());
+
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+
+  auto values = std::vector<llvm::Value*>{};
+  [[maybe_unused]] auto _ = {0, ((values.emplace_back(args.eval())), 0)...};
+
+  auto ret = mb.ir_builder_.CreateCall(fn, values);
+  return value<ReturnType>{ret, fmt::format("{}_ret", fn.name())};
+}
+
 } // namespace codegen

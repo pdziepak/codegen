@@ -77,3 +77,21 @@ TEST(statements, if_condition_nested) {
   EXPECT_EQ(if_cond_nested_ptr(2, 7), 5);
   EXPECT_EQ(if_cond_nested_ptr(2, -7), 10);
 }
+
+TEST(statements, function_call) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "function_call");
+
+  auto add2 = builder.create_function<int32_t(int32_t, int32_t)>(
+      "add2", [](codegen::value<int32_t> x, codegen::value<int32_t> y) { codegen::return_(x + y); });
+
+  auto caller = builder.create_function<int32_t(int32_t, int32_t)>(
+      "caller", [&](codegen::value<int32_t> x, codegen::value<int32_t> y) {
+        codegen::return_(codegen::call(add2, x * x, y * y));
+      });
+
+  auto module = std::move(builder).build();
+
+  auto caller_ptr = module.get_address(caller);
+  EXPECT_EQ(caller_ptr(8, 2), 68);
+}
