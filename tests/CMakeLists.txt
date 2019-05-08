@@ -29,4 +29,5 @@ function(codegen_add_test TESTNAME SOURCE)
   add_test(${TESTNAME} ${TESTNAME})
 endfunction(codegen_add_test)
 
+codegen_add_test(arithmetic_ops arithmetic_ops.cpp)
 codegen_add_test(module_builder module_builder.cpp)

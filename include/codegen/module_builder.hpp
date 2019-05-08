@@ -135,6 +135,8 @@ public:
 
   operator llvm::Value*() const noexcept { return value_; }
 
+  llvm::Value* eval() const { return value_; }
+
   friend std::ostream& operator<<(std::ostream& os, value v) { return os << v.name_; }
 };
 
@@ -142,21 +144,13 @@ template<typename Type> value<Type> constant(Type v) {
   return value<Type>{detail::get_constant<Type>(v), std::to_string(v)};
 }
 
-namespace detail {
-
-template<typename Type> llvm::Value* eval(value<Type> v) {
-  return v;
-}
-
-} // namespace detail
-
 void return_();
 
 template<typename Value> void return_(Value v) {
   auto& mb = *detail::current_builder;
   auto line_no = mb.source_code_.add_line(fmt::format("return {};", v));
   mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
-  mb.ir_builder_.CreateRet(detail::eval(v));
+  mb.ir_builder_.CreateRet(v.eval());
 }
 
 namespace detail {
@@ -165,9 +159,17 @@ template<typename> class function_builder;
 
 template<typename ReturnType, typename... Arguments> class function_builder<ReturnType(Arguments...)> {
   template<typename Argument> void prepare_argument(llvm::Function::arg_iterator args, size_t idx) {
+    auto& mb = *current_builder;
+
     auto it = args + idx;
     auto name = "arg" + std::to_string(idx);
     it->setName(name);
+
+    auto dbg_arg = mb.dbg_builder_.createParameterVariable(mb.dbg_scope_, name, idx + 1, mb.dbg_file_,
+                                                           mb.source_code_.current_line(), type<Argument>::dbg());
+    mb.dbg_builder_.insertDbgValueIntrinsic(&*(args + idx), dbg_arg, mb.dbg_builder_.createExpression(),
+                                            llvm::DebugLoc::get(mb.source_code_.current_line(), 1, mb.dbg_scope_),
+                                            mb.ir_builder_.GetInsertBlock());
   }
 
   template<size_t... Idx, typename FunctionBuilder>
