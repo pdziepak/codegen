@@ -50,6 +50,7 @@ compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
           [this](llvm::orc::VModuleKey vk, llvm::object::ObjectFile const& object,
                  llvm::RuntimeDyld::LoadedObjectInfo const& info) {
             if (gdb_listener_) { gdb_listener_->notifyObjectLoaded(vk, object, info); }
+            loaded_modules_.emplace_back(vk);
           }),
       compile_layer_(session_, object_layer_, llvm::orc::ConcurrentIRCompiler(std::move(tmb))),
       optimize_layer_(session_, compile_layer_, optimize_module),
@@ -77,6 +78,9 @@ compiler::compiler()
 }
 
 compiler::~compiler() {
+  for (auto vk : loaded_modules_) {
+    gdb_listener_->notifyFreeingObject(vk);
+  }
   std::filesystem::remove_all(source_directory_);
 }
 

@@ -49,6 +49,8 @@ class compiler {
 
   std::filesystem::path source_directory_;
 
+  std::vector<llvm::orc::VModuleKey> loaded_modules_;
+
   friend class module_builder;
 private:
   explicit compiler(llvm::orc::JITTargetMachineBuilder);
