@@ -127,6 +127,14 @@ template<> struct type<int32_t> {
   static llvm::Type* llvm() { return llvm::Type::getInt32Ty(*current_builder->context_); }
   static std::string name() { return "i32"; }
 };
+template<typename Type> struct type<Type*> {
+  static constexpr size_t alignment = alignof(Type*);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createPointerType(type<Type>::dbg(), sizeof(Type*) * 8);
+  }
+  static llvm::Type* llvm() { return type<Type>::llvm()->getPointerTo(); }
+  static std::string name() { return type<Type>::name() + '*'; }
+};
 
 template<typename Type> llvm::Value* get_constant(Type);
 

@@ -95,3 +95,43 @@ TEST(statements, function_call) {
   auto caller_ptr = module.get_address(caller);
   EXPECT_EQ(caller_ptr(8, 2), 68);
 }
+
+TEST(statements, load) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "load");
+
+  int32_t value = 8;
+  int32_t* pointer = &value;
+
+  auto load = builder.create_function<int32_t(int32_t**)>(
+      "load_fn", [&](codegen::value<int32_t**> ptr) { codegen::return_(codegen::load(codegen::load(ptr))); });
+
+  auto module = std::move(builder).build();
+
+  auto load_ptr = module.get_address(load);
+  EXPECT_EQ(load_ptr(&pointer), 8);
+  value = 6;
+  EXPECT_EQ(load_ptr(&pointer), 6);
+}
+
+TEST(statements, store) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "store");
+
+  int32_t value = 8;
+  int32_t* pointer = &value;
+
+  auto store = builder.create_function<void(int32_t, int32_t**)>(
+      "store_fn", [&](codegen::value<int32_t> v, codegen::value<int32_t**> ptr) {
+        codegen::store(v + codegen::constant<int32_t>(4), (codegen::load(ptr)));
+        codegen::return_();
+      });
+
+  auto module = std::move(builder).build();
+
+  auto store_ptr = module.get_address(store);
+  store_ptr(9, &pointer);
+  EXPECT_EQ(value, 13);
+  store_ptr(-8, &pointer);
+  EXPECT_EQ(value, -4);
+}

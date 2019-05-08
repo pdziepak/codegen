@@ -23,6 +23,7 @@
 #pragma once
 
 #include "codegen/module_builder.hpp"
+#include "codegen/utils.hpp"
 
 namespace codegen {
 
@@ -93,6 +94,39 @@ value<ReturnType> call(function_ref<ReturnType, Arguments...> const& fn, Values&
 
   auto ret = mb.ir_builder_.CreateCall(fn, values);
   return value<ReturnType>{ret, fmt::format("{}_ret", fn.name())};
+}
+
+template<typename Pointer, typename = std::enable_if_t<std::is_pointer_v<typename std::decay_t<Pointer>::value_type>>>
+auto load(Pointer ptr) {
+  using value_type = std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>;
+  auto& mb = *detail::current_builder;
+
+  auto id = fmt::format("val{}", detail::id_counter++);
+
+  auto line_no = mb.source_code_.add_line(fmt::format("{} = *{}", id, ptr));
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+  auto v = mb.ir_builder_.CreateAlignedLoad(ptr.eval(), detail::type<value_type>::alignment);
+
+  auto dbg_value =
+      mb.dbg_builder_.createAutoVariable(mb.dbg_scope_, id, mb.dbg_file_, line_no, detail::type<value_type>::dbg());
+  mb.dbg_builder_.insertDbgValueIntrinsic(v, dbg_value, mb.dbg_builder_.createExpression(),
+                                          llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_),
+                                          mb.ir_builder_.GetInsertBlock());
+
+  return value<value_type>{v, id};
+}
+
+template<typename Value, typename Pointer,
+         typename = std::enable_if_t<std::is_pointer_v<typename std::decay_t<Pointer>::value_type> &&
+                                     std::is_same_v<typename std::decay_t<Value>::value_type,
+                                                    std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>>>>
+void store(Value v, Pointer ptr) {
+  using value_type = std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>;
+  auto& mb = *detail::current_builder;
+
+  auto line_no = mb.source_code_.add_line(fmt::format("*{} = {}", ptr, v));
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+  mb.ir_builder_.CreateAlignedStore(v.eval(), ptr.eval(), detail::type<value_type>::alignment);
 }
 
 } // namespace codegen

@@ -22,10 +22,18 @@
 
 #pragma once
 
+#include <atomic>
+
 #include <llvm/Support/Error.h>
 #include <llvm/Support/raw_ostream.h>
 
 namespace codegen {
+
+namespace detail {
+
+static inline std::atomic<unsigned> id_counter{};
+
+}
 
 class llvm_error : public std::runtime_error {
 public:
