@@ -47,13 +47,17 @@ void if_(Condition&& cnd, TrueBlock&& tb, FalseBlock&& fb) {
   auto scope = mb.dbg_builder_.createLexicalBlock(mb.dbg_scope_, mb.dbg_file_, mb.source_code_.current_line(), 1);
   auto parent_scope = std::exchange(mb.dbg_scope_, scope);
 
+  assert(!mb.exited_block_);
   tb();
   mb.source_code_.leave_scope();
 
   line_no = mb.source_code_.add_line("} else {");
 
-  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, parent_scope));
-  mb.ir_builder_.CreateBr(merge_block);
+  if (!mb.exited_block_) {
+    mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, parent_scope));
+    mb.ir_builder_.CreateBr(merge_block);
+  }
+  mb.exited_block_ = false;
 
   mb.function_->getBasicBlockList().push_back(false_block);
   mb.ir_builder_.SetInsertPoint(false_block);
@@ -68,8 +72,11 @@ void if_(Condition&& cnd, TrueBlock&& tb, FalseBlock&& fb) {
 
   line_no = mb.source_code_.add_line("}");
 
-  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
-  mb.ir_builder_.CreateBr(merge_block);
+  if (!mb.exited_block_) {
+    mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+    mb.ir_builder_.CreateBr(merge_block);
+  }
+  mb.exited_block_ = false;
 
   mb.function_->getBasicBlockList().push_back(merge_block);
   mb.ir_builder_.SetInsertPoint(merge_block);
@@ -143,6 +150,8 @@ void while_(ConditionFn cnd_fn, Body bdy) {
   auto while_iteration = llvm::BasicBlock::Create(*mb.context_, "while_iteration");
   auto while_break = llvm::BasicBlock::Create(*mb.context_, "while_break");
 
+  auto parent_loop = std::exchange(mb.current_loop_, module_builder::loop{while_continue, while_break});
+
   mb.ir_builder_.CreateBr(while_continue);
   mb.ir_builder_.SetInsertPoint(while_continue);
 
@@ -155,6 +164,8 @@ void while_(ConditionFn cnd_fn, Body bdy) {
 
   mb.function_->getBasicBlockList().push_back(while_iteration);
   mb.ir_builder_.SetInsertPoint(while_iteration);
+
+  assert(!mb.exited_block_);
   bdy();
 
   mb.dbg_scope_ = parent_scope;
@@ -162,11 +173,19 @@ void while_(ConditionFn cnd_fn, Body bdy) {
   mb.source_code_.leave_scope();
   line_no = mb.source_code_.add_line("}");
 
-  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
-  mb.ir_builder_.CreateBr(while_continue);
+  if (!mb.exited_block_) {
+    mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+    mb.ir_builder_.CreateBr(while_continue);
+  }
+  mb.exited_block_ = false;
 
   mb.function_->getBasicBlockList().push_back(while_break);
   mb.ir_builder_.SetInsertPoint(while_break);
+
+  mb.current_loop_ = parent_loop;
 }
+
+void break_();
+void continue_();
 
 } // namespace codegen

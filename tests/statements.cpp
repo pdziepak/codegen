@@ -161,3 +161,56 @@ TEST(statements, while_loop) {
   EXPECT_EQ(fact_ptr(4), 24);
   EXPECT_EQ(fact_ptr(6), 720);
 }
+
+TEST(statements, while_loop_continue) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "while_loop_continue");
+
+  auto while_loop_continue =
+      builder.create_function<int32_t(int32_t)>("while_loop_continue_fn", [&](codegen::value<int32_t> x) {
+        auto value = codegen::variable<int32_t>("value");
+        auto idx = codegen::variable<int32_t>("idx");
+        value.set(codegen::constant<int32_t>(0));
+        idx.set(x);
+        codegen::while_([&] { return idx.get() != codegen::constant<int32_t>(0); },
+                        [&] {
+                          idx.set(idx.get() - codegen::constant<int32_t>(1));
+                          codegen::if_(
+                              idx.get() % codegen::constant<int32_t>(2) == codegen::constant<int32_t>(0),
+                              [&] { codegen::continue_(); }, [&] {});
+                          value.set(value.get() + idx.get());
+                        });
+        codegen::return_(value.get());
+      });
+
+  auto module = std::move(builder).build();
+
+  auto while_loop_continue_ptr = module.get_address(while_loop_continue);
+  EXPECT_EQ(while_loop_continue_ptr(6), 9);
+}
+
+TEST(statements, while_loop_break) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "while_loop_break");
+
+  auto while_loop_break =
+      builder.create_function<int32_t(int32_t)>("while_loop_break_fn", [&](codegen::value<int32_t> x) {
+        auto value = codegen::variable<int32_t>("value");
+        auto idx = codegen::variable<int32_t>("idx");
+        value.set(codegen::constant<int32_t>(0));
+        idx.set(x);
+        codegen::while_([&] { return idx.get() != codegen::constant<int32_t>(0); },
+                        [&] {
+                          idx.set(idx.get() - codegen::constant<int32_t>(1));
+                          codegen::if_(
+                              idx.get() == codegen::constant<int32_t>(2), [&] { codegen::break_(); }, [&] {});
+                          value.set(value.get() + idx.get());
+                        });
+        codegen::return_(value.get());
+      });
+
+  auto module = std::move(builder).build();
+
+  auto while_loop_break_ptr = module.get_address(while_loop_break);
+  EXPECT_EQ(while_loop_break_ptr(6), 12);
+}

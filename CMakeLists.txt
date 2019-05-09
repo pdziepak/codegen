@@ -46,6 +46,7 @@ find_package(fmt REQUIRED)
 add_library(codegen
   src/compiler.cpp
   src/module_builder.cpp
+  src/statements.cpp
 )
 target_include_directories(codegen PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>)
 target_compile_features(codegen PUBLIC cxx_std_17)

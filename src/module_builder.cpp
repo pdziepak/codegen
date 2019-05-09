@@ -75,6 +75,7 @@ std::ostream& operator<<(std::ostream& os, module_builder const& mb) {
 void return_() {
   auto& mb = *detail::current_builder;
   auto line_no = mb.source_code_.add_line("return;");
+  mb.exited_block_ = true;
   mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
   mb.ir_builder_.CreateRetVoid();
 }

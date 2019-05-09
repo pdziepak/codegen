@@ -77,6 +77,13 @@ public: // FIXME: proper encapsulation
   source_code_generator source_code_;
   std::filesystem::path source_file_;
 
+  struct loop {
+    llvm::BasicBlock* continue_block_ = nullptr;
+    llvm::BasicBlock* break_block_ = nullptr;
+  };
+  loop current_loop_;
+  bool exited_block_ = false;
+
   llvm::DIBuilder dbg_builder_;
 
   llvm::DIFile* dbg_file_;
@@ -328,6 +335,7 @@ void return_();
 
 template<typename Value> void return_(Value v) {
   auto& mb = *detail::current_builder;
+  mb.exited_block_ = true;
   auto line_no = mb.source_code_.add_line(fmt::format("return {};", v));
   mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
   mb.ir_builder_.CreateRet(v.eval());
