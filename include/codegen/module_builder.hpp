@@ -172,6 +172,36 @@ template<typename Type> value<Type> constant(Type v) {
   return value<Type>{detail::get_constant<Type>(v), std::to_string(v)};
 }
 
+namespace detail {
+
+template<typename FromValue, typename ToType> class bit_cast_impl {
+  FromValue from_value_;
+
+  using from_type = typename FromValue::value_type;
+
+public:
+  static_assert(sizeof(from_type) == sizeof(ToType));
+  static_assert(std::is_pointer_v<from_type> == std::is_pointer_v<ToType>);
+
+  using value_type = ToType;
+
+  bit_cast_impl(FromValue fv) : from_value_(fv) {}
+
+  llvm::Value* eval() {
+    return detail::current_builder->ir_builder_.CreateBitCast(from_value_.eval(), type<ToType>::llvm());
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, bit_cast_impl bci) {
+    return os << "bit_cast<" << type<ToType>::name() << ">(" << bci.from_value_ << ")";
+  }
+};
+
+} // namespace detail
+
+template<typename ToType, typename FromValue> auto bit_cast(FromValue v) {
+  return detail::bit_cast_impl<FromValue, ToType>(v);
+}
+
 void return_();
 
 template<typename Value> void return_(Value v) {

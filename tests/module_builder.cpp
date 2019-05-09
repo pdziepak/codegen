@@ -86,3 +86,16 @@ TEST(module_builder, external_functions) {
   callee_ptr(&called);
   EXPECT_TRUE(called);
 }
+
+TEST(module_builder, bit_cast) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "bit_cast");
+
+  auto intptr_to_voidptr = builder.create_function<void*(int32_t*)>(
+      "intptr_to_voidptr", [&](codegen::value<int32_t*> ptr) { codegen::return_(codegen::bit_cast<void*>(ptr)); });
+
+  auto module = std::move(builder).build();
+  auto intptr_to_voidptr_ptr = module.get_address(intptr_to_voidptr);
+  int32_t value;
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(intptr_to_voidptr_ptr(&value)), reinterpret_cast<uintptr_t>(&value));
+}
