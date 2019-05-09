@@ -91,9 +91,14 @@ public:
   template<typename FunctionType, typename FunctionBuilder>
   auto create_function(std::string const& name, FunctionBuilder&& fb);
 
+  template<typename FunctionType> auto declare_external_function(std::string const& name, FunctionType* fn);
+
   [[nodiscard]] module build() &&;
 
   friend std::ostream& operator<<(std::ostream&, module_builder const&);
+
+private:
+  void declare_external_symbol(std::string const&, void*);
 };
 
 namespace detail {
@@ -253,6 +258,37 @@ auto module_builder::create_function(std::string const& name, FunctionBuilder&& 
   auto prev_builder = std::exchange(detail::current_builder, this);
   auto fn_ref = detail::function_builder<FunctionType>{}(name, fb);
   detail::current_builder = prev_builder;
+  return fn_ref;
+}
+
+namespace detail {
+
+template<typename> class function_declaration_builder;
+
+template<typename ReturnType, typename... Arguments> class function_declaration_builder<ReturnType(Arguments...)> {
+public:
+  function_ref<ReturnType, Arguments...> operator()(std::string const& name) {
+    auto& mb = *current_builder;
+
+    auto fn_type = llvm::FunctionType::get(type<ReturnType>::llvm(), {type<Arguments>::llvm()...}, false);
+    auto fn = llvm::Function::Create(fn_type, llvm::GlobalValue::LinkageTypes::ExternalLinkage, name, mb.module_.get());
+
+    return function_ref<ReturnType, Arguments...>{name, fn};
+  }
+};
+
+} // namespace detail
+
+template<typename FunctionType>
+auto module_builder::declare_external_function(std::string const& name, FunctionType* fn) {
+  assert(detail::current_builder == this || !detail::current_builder);
+
+  auto prev_builder = std::exchange(detail::current_builder, this);
+  auto fn_ref = detail::function_declaration_builder<FunctionType>{}(name);
+  detail::current_builder = prev_builder;
+
+  declare_external_symbol(name, reinterpret_cast<void*>(fn));
+
   return fn_ref;
 }
 

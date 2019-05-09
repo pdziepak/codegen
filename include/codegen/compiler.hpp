@@ -27,6 +27,7 @@
 #include <llvm/ExecutionEngine/JITEventListener.h>
 
 #include <llvm/ExecutionEngine/Orc/Core.h>
+#include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
 #include <llvm/ExecutionEngine/Orc/IRCompileLayer.h>
 #include <llvm/ExecutionEngine/Orc/IRTransformLayer.h>
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
@@ -51,7 +52,11 @@ class compiler {
 
   std::vector<llvm::orc::VModuleKey> loaded_modules_;
 
+  std::unordered_map<std::string, uintptr_t> external_symbols_;
+  llvm::orc::DynamicLibrarySearchGenerator dynlib_generator_;
+
   friend class module_builder;
+
 private:
   explicit compiler(llvm::orc::JITTargetMachineBuilder);
 
@@ -61,6 +66,8 @@ public:
 
   compiler(compiler const&) = delete;
   compiler(compiler&&) = delete;
+
+  void add_symbol(std::string const& name, void* address);
 
 private:
   static llvm::Expected<llvm::orc::ThreadSafeModule> optimize_module(llvm::orc::ThreadSafeModule,

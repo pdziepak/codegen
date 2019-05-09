@@ -25,6 +25,7 @@
 #include "codegen/compiler.hpp"
 #include "codegen/module.hpp"
 #include "codegen/module_builder.hpp"
+#include "codegen/statements.hpp"
 
 TEST(module_builder, empty) {
   auto comp = codegen::compiler{};
@@ -61,4 +62,27 @@ TEST(module_builder, return_i32) {
   EXPECT_EQ(return_argument_ptr(1), 1);
   EXPECT_EQ(return_argument_ptr(8), 8);
   EXPECT_EQ(return_argument_ptr(-7), -7);
+}
+
+TEST(module_builder, external_functions) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "external_functions");
+
+  bool called = false;
+  auto callee = builder.declare_external_function<void(bool*)>("set_true", [](bool* flag) { *flag = true; });
+
+  auto caller = builder.create_function<void(bool*)>("caller", [&](codegen::value<bool*> f) {
+    codegen::call(callee, f);
+    codegen::return_();
+  });
+
+  auto module = std::move(builder).build();
+  auto caller_ptr = module.get_address(caller);
+  caller_ptr(&called);
+  EXPECT_TRUE(called);
+
+  called = false;
+  auto callee_ptr = module.get_address(callee);
+  callee_ptr(&called);
+  EXPECT_TRUE(called);
 }

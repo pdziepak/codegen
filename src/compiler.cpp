@@ -61,12 +61,33 @@ compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
         auto eng = std::default_random_engine{std::random_device{}()};
         auto dist = std::uniform_int_distribution<uint64_t>{};
         return std::filesystem::temp_directory_path() / (get_process_name() + "-" + std::to_string(dist(eng)));
-      }()) {
-  auto gen = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(data_layout_);
-  session_.getMainJITDylib().setGenerator(*gen);
+      }()),
+      dynlib_generator_(unwrap(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(data_layout_))) {
+  session_.getMainJITDylib().setGenerator([this](llvm::orc::JITDylib& jd,
+                                                 llvm::orc::SymbolNameSet const& Names) -> llvm::orc::SymbolNameSet {
+    auto added = llvm::orc::SymbolNameSet{};
+    auto remaining = llvm::orc::SymbolNameSet{};
+    auto new_symbols = llvm::orc::SymbolMap{};
+
+    for (auto& name : Names) {
+      auto it = external_symbols_.find(std::string(*name));
+      if (it == external_symbols_.end()) {
+        remaining.insert(name);
+        continue;
+      }
+      added.insert(name);
+      new_symbols[name] = llvm::JITEvaluatedSymbol(llvm::JITTargetAddress{it->second}, llvm::JITSymbolFlags::Exported);
+    }
+    throw_on_error(jd.define(llvm::orc::absoluteSymbols(std::move(new_symbols))));
+    if (!remaining.empty()) {
+      auto dynlib_added = dynlib_generator_(jd, remaining);
+      added.insert(dynlib_added.begin(), dynlib_added.end());
+    }
+    return added;
+  });
 
   std::filesystem::create_directories(source_directory_);
-}
+} // namespace codegen
 
 compiler::compiler()
     : compiler([] {
@@ -108,6 +129,10 @@ llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc:
   module_passes.run(*module.getModule());
 
   return module;
+}
+
+void compiler::add_symbol(std::string const& name, void* address) {
+  external_symbols_[name] = reinterpret_cast<uintptr_t>(address);
 }
 
 module::module(llvm::orc::ExecutionSession& session, llvm::DataLayout const& dl)

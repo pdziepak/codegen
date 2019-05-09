@@ -62,6 +62,10 @@ std::string module_builder::source_code_generator::get() const {
   return source_code_.str();
 }
 
+void module_builder::declare_external_symbol(std::string const& name, void* address) {
+  compiler_->add_symbol(name, address);
+}
+
 std::ostream& operator<<(std::ostream& os, module_builder const& mb) {
   auto llvm_os = llvm::raw_os_ostream(os);
   mb.module_->print(llvm_os, nullptr);
