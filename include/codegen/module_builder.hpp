@@ -156,6 +156,38 @@ template<> struct type<int64_t> {
   static llvm::Type* llvm() { return llvm::Type::getInt64Ty(*current_builder->context_); }
   static std::string name() { return "i64"; }
 };
+template<> struct type<uint8_t> {
+  static constexpr size_t alignment = alignof(uint8_t);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 8, llvm::dwarf::DW_ATE_unsigned);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getInt8Ty(*current_builder->context_); }
+  static std::string name() { return "u8"; }
+};
+template<> struct type<uint16_t> {
+  static constexpr size_t alignment = alignof(uint16_t);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 16, llvm::dwarf::DW_ATE_unsigned);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getInt16Ty(*current_builder->context_); }
+  static std::string name() { return "u16"; }
+};
+template<> struct type<uint32_t> {
+  static constexpr size_t alignment = alignof(uint32_t);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 32, llvm::dwarf::DW_ATE_unsigned);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getInt32Ty(*current_builder->context_); }
+  static std::string name() { return "u32"; }
+};
+template<> struct type<uint64_t> {
+  static constexpr size_t alignment = alignof(uint64_t);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 64, llvm::dwarf::DW_ATE_unsigned);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getInt64Ty(*current_builder->context_); }
+  static std::string name() { return "u64"; }
+};
 template<typename Type> struct type<Type*> {
   static constexpr size_t alignment = alignof(Type*);
   static llvm::DIType* dbg() {
