@@ -271,10 +271,57 @@ public:
   }
 };
 
+template<typename FromValue, typename ToType> class cast_impl {
+  FromValue from_value_;
+
+  using from_type = typename FromValue::value_type;
+  using to_type = ToType;
+
+public:
+  static_assert(!std::is_pointer_v<from_type> && !std::is_pointer_v<ToType>);
+
+  using value_type = ToType;
+
+  cast_impl(FromValue fv) : from_value_(fv) {}
+
+  llvm::Value* eval() {
+    auto& mb = *current_builder;
+    if constexpr (std::is_floating_point_v<from_type> && std::is_floating_point_v<to_type>) {
+      return mb.ir_builder_.CreateFPCast(from_value_.eval(), type<to_type>::llvm());
+    } else if constexpr (std::is_floating_point_v<from_type> && std::is_integral_v<to_type>) {
+      if constexpr (std::is_signed_v<to_type>) {
+        return mb.ir_builder_.CreateFPToSI(from_value_.eval(), type<to_type>::llvm());
+      } else {
+        return mb.ir_builder_.CreateFPToUI(from_value_.eval(), type<to_type>::llvm());
+      }
+    } else if constexpr (std::is_integral_v<from_type> && std::is_floating_point_v<to_type>) {
+      if constexpr (std::is_signed_v<from_type>) {
+        return mb.ir_builder_.CreateSIToFP(from_value_.eval(), type<to_type>::llvm());
+      } else {
+        return mb.ir_builder_.CreateUIToFP(from_value_.eval(), type<to_type>::llvm());
+      }
+    } else if constexpr (std::is_integral_v<from_type> && std::is_integral_v<to_type>) {
+      if constexpr (std::is_signed_v<from_type>) {
+        return mb.ir_builder_.CreateSExtOrTrunc(from_value_.eval(), type<to_type>::llvm());
+      } else {
+        return mb.ir_builder_.CreateZExtOrTrunc(from_value_.eval(), type<to_type>::llvm());
+      }
+    }
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, cast_impl ci) {
+    return os << "cast<" << type<ToType>::name() << ">(" << ci.from_value_ << ")";
+  }
+};
+
 } // namespace detail
 
 template<typename ToType, typename FromValue> auto bit_cast(FromValue v) {
   return detail::bit_cast_impl<FromValue, ToType>(v);
+}
+
+template<typename ToType, typename FromValue> auto cast(FromValue v) {
+  return detail::cast_impl<FromValue, ToType>(v);
 }
 
 void return_();

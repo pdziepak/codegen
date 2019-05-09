@@ -99,3 +99,34 @@ TEST(module_builder, bit_cast) {
   int32_t value;
   EXPECT_EQ(reinterpret_cast<uintptr_t>(intptr_to_voidptr_ptr(&value)), reinterpret_cast<uintptr_t>(&value));
 }
+
+TEST(module_builder, cast) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "cast");
+
+  auto f32_to_i16 = builder.create_function<int16_t(float)>(
+      "f32_to_i16", [&](codegen::value<float> x) { codegen::return_(codegen::cast<int16_t>(x)); });
+
+  auto i32_to_f64 = builder.create_function<double(int32_t)>(
+      "i32_to_f64", [&](codegen::value<int32_t> x) { codegen::return_(codegen::cast<double>(x)); });
+
+  auto i16_to_i64 = builder.create_function<int64_t(int16_t)>(
+      "i16_to_i64", [&](codegen::value<int16_t> x) { codegen::return_(codegen::cast<int64_t>(x)); });
+
+  auto u16_to_u64 = builder.create_function<uint64_t(uint16_t)>(
+      "u16_to_u64", [&](codegen::value<uint16_t> x) { codegen::return_(codegen::cast<uint64_t>(x)); });
+
+  auto module = std::move(builder).build();
+
+  auto f32_to_i16_ptr = module.get_address(f32_to_i16);
+  EXPECT_EQ(f32_to_i16_ptr(3.5f), 3);
+
+  auto i32_to_f64_ptr = module.get_address(i32_to_f64);
+  EXPECT_EQ(i32_to_f64_ptr(4), 4.);
+
+  auto i16_to_i64_ptr = module.get_address(i16_to_i64);
+  EXPECT_EQ(i16_to_i64_ptr(-1), -1);
+
+  auto u16_to_u64_ptr = module.get_address(u16_to_u64);
+  EXPECT_EQ(u16_to_u64_ptr(-1), 0xffff);
+}
