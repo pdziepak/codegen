@@ -188,6 +188,22 @@ template<> struct type<uint64_t> {
   static llvm::Type* llvm() { return llvm::Type::getInt64Ty(*current_builder->context_); }
   static std::string name() { return "u64"; }
 };
+template<> struct type<float> {
+  static constexpr size_t alignment = alignof(float);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 32, llvm::dwarf::DW_ATE_float);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getFloatTy(*current_builder->context_); }
+  static std::string name() { return "f32"; }
+};
+template<> struct type<double> {
+  static constexpr size_t alignment = alignof(double);
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 64, llvm::dwarf::DW_ATE_float);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getDoubleTy(*current_builder->context_); }
+  static std::string name() { return "f64"; }
+};
 template<typename Type> struct type<Type*> {
   static constexpr size_t alignment = alignof(Type*);
   static llvm::DIType* dbg() {
@@ -197,13 +213,16 @@ template<typename Type> struct type<Type*> {
   static std::string name() { return type<Type>::name() + '*'; }
 };
 
-template<typename Type> llvm::Value* get_constant(Type);
+template<typename Type> std::enable_if_t<std::is_arithmetic_v<Type>, llvm::Value*> get_constant(Type v) {
+  if constexpr (std::is_integral_v<Type>) {
+    return llvm::ConstantInt::get(*current_builder->context_, llvm::APInt(sizeof(Type) * 8, v, std::is_signed_v<Type>));
+  } else if constexpr (std::is_floating_point_v<Type>) {
+    return llvm::ConstantFP::get(*current_builder->context_, llvm::APFloat(v));
+  }
+}
 
 template<> inline llvm::Value* get_constant<bool>(bool v) {
   return llvm::ConstantInt::get(*current_builder->context_, llvm::APInt(1, v, true));
-}
-template<> inline llvm::Value* get_constant<int32_t>(int32_t v) {
-  return llvm::ConstantInt::get(*current_builder->context_, llvm::APInt(32, v, true));
 }
 
 } // namespace detail

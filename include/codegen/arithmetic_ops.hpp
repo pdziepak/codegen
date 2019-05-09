@@ -51,25 +51,38 @@ public:
   arithmetic_operation(LHS lhs, RHS rhs) : lhs_(std::move(lhs)), rhs_(std::move(rhs)) {}
 
   llvm::Value* eval() const {
-    switch (Op) {
-    case arithmetic_operation_type::add: return current_builder->ir_builder_.CreateAdd(lhs_.eval(), rhs_.eval());
-    case arithmetic_operation_type::sub: return current_builder->ir_builder_.CreateSub(lhs_.eval(), rhs_.eval());
-    case arithmetic_operation_type::mul: return current_builder->ir_builder_.CreateMul(lhs_.eval(), rhs_.eval());
-    case arithmetic_operation_type::div:
-      if constexpr (std::is_signed_v<value_type>) {
-        return current_builder->ir_builder_.CreateSDiv(lhs_.eval(), rhs_.eval());
-      } else {
-        return current_builder->ir_builder_.CreateUDiv(lhs_.eval(), rhs_.eval());
+    if constexpr (std::is_integral_v<value_type>) {
+      switch (Op) {
+      case arithmetic_operation_type::add: return current_builder->ir_builder_.CreateAdd(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::sub: return current_builder->ir_builder_.CreateSub(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::mul: return current_builder->ir_builder_.CreateMul(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::div:
+        if constexpr (std::is_signed_v<value_type>) {
+          return current_builder->ir_builder_.CreateSDiv(lhs_.eval(), rhs_.eval());
+        } else {
+          return current_builder->ir_builder_.CreateUDiv(lhs_.eval(), rhs_.eval());
+        }
+      case arithmetic_operation_type::mod:
+        if constexpr (std::is_signed_v<value_type>) {
+          return current_builder->ir_builder_.CreateSRem(lhs_.eval(), rhs_.eval());
+        } else {
+          return current_builder->ir_builder_.CreateURem(lhs_.eval(), rhs_.eval());
+        }
+      case arithmetic_operation_type::and_: return current_builder->ir_builder_.CreateAnd(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::or_: return current_builder->ir_builder_.CreateOr(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::xor_: return current_builder->ir_builder_.CreateXor(lhs_.eval(), rhs_.eval());
       }
-    case arithmetic_operation_type::mod:
-      if constexpr (std::is_signed_v<value_type>) {
-        return current_builder->ir_builder_.CreateSRem(lhs_.eval(), rhs_.eval());
-      } else {
-        return current_builder->ir_builder_.CreateURem(lhs_.eval(), rhs_.eval());
+    } else {
+      switch (Op) {
+      case arithmetic_operation_type::add: return current_builder->ir_builder_.CreateFAdd(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::sub: return current_builder->ir_builder_.CreateFSub(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::mul: return current_builder->ir_builder_.CreateFMul(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::div: return current_builder->ir_builder_.CreateFDiv(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::mod: return current_builder->ir_builder_.CreateFRem(lhs_.eval(), rhs_.eval());
+      case arithmetic_operation_type::and_: [[fallthrough]];
+      case arithmetic_operation_type::or_: [[fallthrough]];
+      case arithmetic_operation_type::xor_: abort();
       }
-    case arithmetic_operation_type::and_: return current_builder->ir_builder_.CreateAnd(lhs_.eval(), rhs_.eval());
-    case arithmetic_operation_type::or_: return current_builder->ir_builder_.CreateOr(lhs_.eval(), rhs_.eval());
-    case arithmetic_operation_type::xor_: return current_builder->ir_builder_.CreateXor(lhs_.eval(), rhs_.eval());
     }
   }
 

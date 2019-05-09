@@ -102,6 +102,43 @@ TEST(arithmetic_ops, unsigned_integer_arithmetic) {
   EXPECT_EQ(mul_div_mod2_ptr(1, uint32_t(-7)), 1);
 }
 
+TEST(arithmetic_ops, float_arithmetic) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "float_arithmetic");
+
+  auto add2 = builder.create_function<float(float, float)>(
+      "add2", [](codegen::value<float> x, codegen::value<float> y) { codegen::return_(x + y + codegen::constant<float>(0.5f)); });
+
+  auto add4 = builder.create_function<float(float, float, float, float)>(
+      "add4", [](codegen::value<float> x, codegen::value<float> y, codegen::value<float> z, codegen::value<float> w) {
+        codegen::return_(x + y + z + w);
+      });
+
+  auto sub_add4 = builder.create_function<float(float, float, float, float)>(
+      "sub_add4", [](codegen::value<float> x, codegen::value<float> y, codegen::value<float> z,
+                     codegen::value<float> w) { codegen::return_(x - y + z - w); });
+
+  auto mul_div_mod2 = builder.create_function<float(float, float)>(
+      "mul_div_mod2", [](codegen::value<float> x, codegen::value<float> y) { codegen::return_((x / y) * y + x % y); });
+
+  auto module = std::move(builder).build();
+
+  auto add2_ptr = module.get_address(add2);
+  EXPECT_EQ(add2_ptr(1, 2), 3.5f);
+
+  auto add4_ptr = module.get_address(add4);
+  EXPECT_EQ(add4_ptr(1, 2, 3, 4), 10);
+
+  auto sub_add4_ptr = module.get_address(sub_add4);
+  EXPECT_EQ(sub_add4_ptr(1, 2, 3, 4), -2);
+
+  auto mul_div_mod2_ptr = module.get_address(mul_div_mod2);
+  EXPECT_EQ(mul_div_mod2_ptr(7, 2), 8);
+  EXPECT_EQ(mul_div_mod2_ptr(11, 3), 13);
+  EXPECT_EQ(mul_div_mod2_ptr(4, -3), 5);
+  EXPECT_EQ(mul_div_mod2_ptr(1, -7), 2);
+}
+
 TEST(arithmetic_ops, signed_integer_bitwise) {
   auto comp = codegen::compiler{};
   auto builder = codegen::module_builder(comp, "signed_integer_bitwise");
