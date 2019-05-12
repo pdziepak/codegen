@@ -23,9 +23,12 @@
 #include <gtest/gtest.h>
 
 #include "codegen/compiler.hpp"
+#include "codegen/literals.hpp"
 #include "codegen/module.hpp"
 #include "codegen/module_builder.hpp"
 #include "codegen/statements.hpp"
+
+using namespace codegen::literals;
 
 TEST(module_builder, empty) {
   auto comp = codegen::compiler{};
@@ -47,8 +50,7 @@ TEST(module_builder, return_i32) {
   auto comp = codegen::compiler{};
   auto builder = codegen::module_builder(comp, "return_i32");
 
-  auto return_constant =
-      builder.create_function<int32_t()>("return_constant", [] { codegen::return_(codegen::constant<int32_t>(4)); });
+  auto return_constant = builder.create_function<int32_t()>("return_constant", [] { codegen::return_(4_i32); });
 
   auto return_argument = builder.create_function<int32_t(int32_t)>(
       "return_argument", [](codegen::value<int32_t> arg) { codegen::return_(arg); });
