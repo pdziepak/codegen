@@ -27,6 +27,7 @@
 #include "codegen/compiler.hpp"
 #include "codegen/module.hpp"
 #include "codegen/module_builder.hpp"
+#include "codegen/statements.hpp"
 
 TEST(arithmetic_ops, signed_integer_arithmetic) {
   auto comp = codegen::compiler{};
@@ -106,8 +107,10 @@ TEST(arithmetic_ops, float_arithmetic) {
   auto comp = codegen::compiler{};
   auto builder = codegen::module_builder(comp, "float_arithmetic");
 
-  auto add2 = builder.create_function<float(float, float)>(
-      "add2", [](codegen::value<float> x, codegen::value<float> y) { codegen::return_(x + y + codegen::constant<float>(0.5f)); });
+  auto add2 =
+      builder.create_function<float(float, float)>("add2", [](codegen::value<float> x, codegen::value<float> y) {
+        codegen::return_(x + y + codegen::constant<float>(0.5f));
+      });
 
   auto add4 = builder.create_function<float(float, float, float, float)>(
       "add4", [](codegen::value<float> x, codegen::value<float> y, codegen::value<float> z, codegen::value<float> w) {
@@ -172,4 +175,37 @@ TEST(arithmetic_ops, signed_integer_bitwise) {
 
   auto and_or_xor4_ptr = module.get_address(and_or_xor4);
   EXPECT_EQ(and_or_xor4_ptr(3, 6, 11, 14), 13);
+}
+
+TEST(arithmetic_ops, pointer_arithmetic) {
+
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "pointer_arithmetic");
+
+  auto add = builder.create_function<int32_t(int32_t*, int32_t)>(
+      "add", [](codegen::value<int32_t*> x, codegen::value<int32_t> y) { codegen::return_(codegen::load(x + y)); });
+
+  auto add2 = builder.create_function<int32_t(int32_t*, int32_t, int32_t)>(
+      "add2", [](codegen::value<int32_t*> x, codegen::value<int32_t> y, codegen::value<int32_t> z) {
+        codegen::return_(codegen::load(x + y + z));
+      });
+
+  auto sub = builder.create_function<int32_t(int32_t*, int32_t)>(
+      "sub", [](codegen::value<int32_t*> x, codegen::value<int32_t> y) { codegen::return_(codegen::load(x - y)); });
+
+  int32_t values[] = {
+      0, 1, 2, 3, 4,
+  };
+
+  auto module = std::move(builder).build();
+
+  auto add_ptr = module.get_address(add);
+  EXPECT_EQ(add_ptr(&values[1], 2), 3);
+  EXPECT_EQ(add_ptr(&values[1], -1), 0);
+
+  auto add2_ptr = module.get_address(add2);
+  EXPECT_EQ(add2_ptr(&values[1], 3, -2), 2);
+
+  auto sub_ptr = module.get_address(sub);
+  EXPECT_EQ(sub_ptr(&values[3], 2), 1);
 }

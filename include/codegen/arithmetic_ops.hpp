@@ -103,6 +103,54 @@ public:
   }
 };
 
+enum class pointer_arithmetic_operation_type {
+  add,
+  sub,
+};
+
+template<pointer_arithmetic_operation_type Op, typename LHS, typename RHS> class pointer_arithmetic_operation {
+  LHS lhs_;
+  RHS rhs_;
+
+  static_assert(std::is_pointer_v<typename LHS::value_type>);
+  static_assert(std::is_integral_v<typename RHS::value_type>);
+
+  using rhs_value_type = typename RHS::value_type;
+
+public:
+  using value_type = typename LHS::value_type;
+
+  pointer_arithmetic_operation(LHS lhs, RHS rhs) : lhs_(std::move(lhs)), rhs_(std::move(rhs)) {}
+
+  llvm::Value* eval() const {
+    auto& mb = *current_builder;
+    auto rhs = rhs_.eval();
+    if constexpr (sizeof(rhs_value_type) < sizeof(uint64_t)) {
+      if constexpr (std::is_unsigned_v<rhs_value_type>) {
+        rhs = mb.ir_builder_.CreateZExt(rhs, type<uint64_t>::llvm());
+      } else {
+        rhs = mb.ir_builder_.CreateSExt(rhs, type<int64_t>::llvm());
+      }
+    }
+    switch (Op) {
+    case pointer_arithmetic_operation_type::add: return mb.ir_builder_.CreateInBoundsGEP(lhs_.eval(), rhs);
+    case pointer_arithmetic_operation_type::sub:
+      return mb.ir_builder_.CreateInBoundsGEP(lhs_.eval(), mb.ir_builder_.CreateSub(constant<int64_t>(0), rhs));
+    }
+    abort();
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, pointer_arithmetic_operation const& ao) {
+    auto symbol = [] {
+      switch (Op) {
+      case pointer_arithmetic_operation_type::add: return '+';
+      case pointer_arithmetic_operation_type::sub: return '-';
+      }
+    }();
+    return os << '(' << ao.lhs_ << ' ' << symbol << ' ' << ao.rhs_ << ')';
+  }
+};
+
 } // namespace detail
 
 template<typename LHS, typename RHS,
@@ -161,6 +209,24 @@ template<typename LHS, typename RHS,
 auto operator^(LHS lhs, RHS rhs) {
   return detail::arithmetic_operation<detail::arithmetic_operation_type::xor_, LHS, RHS>(std::move(lhs),
                                                                                          std::move(rhs));
+}
+
+template<typename LHS, typename RHS,
+         typename = std::enable_if_t<std::is_integral_v<typename RHS::value_type> &&
+                                     std::is_pointer_v<typename LHS::value_type>>,
+         typename = void>
+auto operator+(LHS lhs, RHS rhs) {
+  return detail::pointer_arithmetic_operation<detail::pointer_arithmetic_operation_type::add, LHS, RHS>(std::move(lhs),
+                                                                                                        std::move(rhs));
+}
+
+template<typename LHS, typename RHS,
+         typename = std::enable_if_t<std::is_integral_v<typename RHS::value_type> &&
+                                     std::is_pointer_v<typename LHS::value_type>>,
+         typename = void>
+auto operator-(LHS lhs, RHS rhs) {
+  return detail::pointer_arithmetic_operation<detail::pointer_arithmetic_operation_type::sub, LHS, RHS>(std::move(lhs),
+                                                                                                        std::move(rhs));
 }
 
 } // namespace codegen
