@@ -49,6 +49,24 @@ TEST(statements, if_condition) {
   EXPECT_EQ(if_cond_ptr(2), 5);
 }
 
+TEST(statements, if_condition_true_only) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "if_cond_true_only");
+
+  auto if_cond = builder.create_function<int32_t(int32_t)>("if_cond_fn", [](codegen::value<int32_t> x) {
+    auto y = codegen::variable<int32_t>{"ret"};
+    y.set(x);
+    codegen::if_(x > codegen::constant<int32_t>(4), [&] { y.set(x + x); });
+    codegen::return_(y.get() + codegen::constant<int32_t>(1));
+  });
+
+  auto module = std::move(builder).build();
+
+  auto if_cond_ptr = module.get_address(if_cond);
+  EXPECT_EQ(if_cond_ptr(8), 17);
+  EXPECT_EQ(if_cond_ptr(2), 3);
+}
+
 TEST(statements, if_condition_nested) {
   auto comp = codegen::compiler{};
   auto builder = codegen::module_builder(comp, "if_cond_nested");

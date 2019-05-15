@@ -82,6 +82,43 @@ void if_(Condition&& cnd, TrueBlock&& tb, FalseBlock&& fb) {
   mb.ir_builder_.SetInsertPoint(merge_block);
 }
 
+template<typename Condition, typename TrueBlock,
+         typename = std::enable_if_t<std::is_same_v<typename std::decay_t<Condition>::value_type, bool>>>
+void if_(Condition&& cnd, TrueBlock&& tb) {
+  auto& mb = *detail::current_builder;
+
+  auto line_no = mb.source_code_.add_line(fmt::format("if ({}) {{", cnd));
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+
+  auto true_block = llvm::BasicBlock::Create(*mb.context_, "true_block", mb.function_);
+  auto merge_block = llvm::BasicBlock::Create(*mb.context_, "merge_block");
+
+  mb.ir_builder_.CreateCondBr(cnd.eval(), true_block, merge_block);
+
+  mb.ir_builder_.SetInsertPoint(true_block);
+  mb.source_code_.enter_scope();
+
+  auto scope = mb.dbg_builder_.createLexicalBlock(mb.dbg_scope_, mb.dbg_file_, mb.source_code_.current_line(), 1);
+  auto parent_scope = std::exchange(mb.dbg_scope_, scope);
+
+  assert(!mb.exited_block_);
+  tb();
+  mb.source_code_.leave_scope();
+
+  mb.dbg_scope_ = parent_scope;
+
+  line_no = mb.source_code_.add_line("}");
+
+  if (!mb.exited_block_) {
+    mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+    mb.ir_builder_.CreateBr(merge_block);
+  }
+  mb.exited_block_ = false;
+
+  mb.function_->getBasicBlockList().push_back(merge_block);
+  mb.ir_builder_.SetInsertPoint(merge_block);
+}
+
 template<typename ReturnType, typename... Arguments, typename... Values>
 value<ReturnType> call(function_ref<ReturnType, Arguments...> const& fn, Values&&... args) {
   static_assert((std::is_same_v<Arguments, typename std::decay_t<Values>::value_type> && ...));
