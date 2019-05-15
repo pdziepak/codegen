@@ -241,6 +241,11 @@ template<typename Type> class value {
 public:
   explicit value(llvm::Value* v, std::string const& n) : value_(v), name_(n) {}
 
+  value(value const&) = default;
+  value(value&&) = default;
+  void operator=(value const&) = delete;
+  void operator=(value&&) = delete;
+
   using value_type = Type;
 
   operator llvm::Value*() const noexcept { return value_; }
