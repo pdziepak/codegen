@@ -44,6 +44,8 @@ public:
                                   llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_), mb.ir_builder_.GetInsertBlock());
   }
 
+  template<typename Value> explicit variable(std::string const& n, Value const& v) : variable(n) { set<Value>(v); }
+
   variable(variable const&) = delete;
   variable(variable&&) = delete;
 
