@@ -251,8 +251,17 @@ public:
 };
 
 template<typename Type> value<Type> constant(Type v) {
-  return value<Type>{detail::get_constant<Type>(v), std::to_string(v)};
+  return value<Type>{detail::get_constant<Type>(v), [&] {
+                       if constexpr (std::is_same_v<Type, bool>) {
+                         return v ? "true" : "false";
+                       } else {
+                         return std::to_string(v);
+                       }
+                     }()};
 }
+
+value<bool> true_();
+value<bool> false_();
 
 namespace detail {
 

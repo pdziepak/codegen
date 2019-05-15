@@ -28,7 +28,7 @@
 
 #include "codegen/compiler.hpp"
 #include "codegen/module.hpp"
-#include <iostream>
+
 namespace codegen {
 
 module_builder::module_builder(compiler& c, std::string const& name)
@@ -70,6 +70,13 @@ std::ostream& operator<<(std::ostream& os, module_builder const& mb) {
   auto llvm_os = llvm::raw_os_ostream(os);
   mb.module_->print(llvm_os, nullptr);
   return os;
+}
+
+value<bool> true_() {
+  return constant(true);
+}
+value<bool> false_() {
+  return constant(false);
 }
 
 void return_() {
