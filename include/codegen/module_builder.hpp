@@ -131,6 +131,14 @@ template<> struct type<bool> {
   static llvm::Type* llvm() { return llvm::Type::getInt1Ty(*current_builder->context_); }
   static std::string name() { return "bool"; }
 };
+template<> struct type<std::byte> {
+  static constexpr size_t alignment = 1;
+  static llvm::DIType* dbg() {
+    return current_builder->dbg_builder_.createBasicType(name(), 8, llvm::dwarf::DW_ATE_unsigned);
+  }
+  static llvm::Type* llvm() { return llvm::Type::getInt8Ty(*current_builder->context_); }
+  static std::string name() { return "byte"; }
+};
 template<> struct type<int8_t> {
   static constexpr size_t alignment = alignof(int8_t);
   static llvm::DIType* dbg() {
@@ -430,6 +438,7 @@ template<typename FunctionType, typename FunctionBuilder>
 auto module_builder::create_function(std::string const& name, FunctionBuilder&& fb) {
   assert(detail::current_builder == this || !detail::current_builder);
   auto prev_builder = std::exchange(detail::current_builder, this);
+  exited_block_ = false;
   auto fn_ref = detail::function_builder<FunctionType>{}(name, fb);
   detail::current_builder = prev_builder;
   return fn_ref;
