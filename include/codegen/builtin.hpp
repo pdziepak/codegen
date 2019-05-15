@@ -41,6 +41,23 @@ template<typename Destination, typename Source, typename Size> void memcpy(Desti
                               detail::type<typename Source::value_type>::alignment, n.eval());
 }
 
+template<typename Source1, typename Source2, typename Size> value<int> memcmp(Source1 src1, Source2 src2, Size n) {
+  static_assert(std::is_pointer_v<typename Source1::value_type>);
+  static_assert(std::is_pointer_v<typename Source2::value_type>);
+
+  using namespace detail;
+  auto& mb = *detail::current_builder;
+
+  auto fn_type = llvm::FunctionType::get(type<int>::llvm(),
+                                         {type<void*>::llvm(), type<void*>::llvm(), type<size_t>::llvm()}, false);
+  auto fn =
+      llvm::Function::Create(fn_type, llvm::GlobalValue::LinkageTypes::ExternalLinkage, "memcmp", mb.module_.get());
+
+  auto line_no = mb.source_code_.add_line(fmt::format("memcmp_ret = memcmp({}, {}, {});", src1, src2, n));
+  mb.ir_builder_.SetCurrentDebugLocation(llvm::DebugLoc::get(line_no, 1, mb.dbg_scope_));
+  return value<int>{mb.ir_builder_.CreateCall(fn, {src1.eval(), src2.eval(), n.eval()}), "memcmp_ret"};
+}
+
 namespace detail {
 
 template<typename Value> class bswap_impl {
