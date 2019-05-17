@@ -20,6 +20,8 @@
  * SOFTWARE.
  */
 
+#include <random>
+
 #include <gtest/gtest.h>
 
 #include "codegen/arithmetic_ops.hpp"
@@ -30,6 +32,7 @@
 #include "codegen/module_builder.hpp"
 #include "codegen/relational_ops.hpp"
 #include "codegen/statements.hpp"
+#include "codegen/variable.hpp"
 
 namespace cg = codegen;
 using namespace cg::literals;
@@ -138,4 +141,44 @@ TEST(examples, tuple_i32str_less) {
   EXPECT_FALSE(less_ptr(make_tuple(1, "bbb").get(), make_tuple(1, "abc").get()));
   EXPECT_FALSE(less_ptr(make_tuple(1, "bbb").get(), make_tuple(1, "bb").get()));
   EXPECT_FALSE(less_ptr(make_tuple(1, "z").get(), make_tuple(1, "bbb").get()));
+}
+
+TEST(examples, soa_compute) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "soa_compute");
+  auto compute = builder.create_function<void(int32_t, int32_t*, int32_t*, int32_t*, uint64_t)>(
+      "compute", [&](cg::value<int32_t> a, cg::value<int32_t*> b_ptr, cg::value<int32_t*> c_ptr,
+                     cg::value<int32_t*> d_ptr, cg::value<uint64_t> n) {
+        auto idx = cg::variable<uint64_t>("idx", 0_u64);
+        cg::while_([&] { return idx.get() < n; },
+                   [&] {
+                     auto i = idx.get();
+                     cg::store(a * cg::load(b_ptr + i) + cg::load(c_ptr + i), d_ptr + i);
+                     idx.set(i + 1_u64);
+                   });
+        cg::return_();
+      });
+
+  auto module = std::move(builder).build();
+  auto compute_ptr = module.get_address(compute);
+  compute_ptr(0, nullptr, nullptr, nullptr, 0);
+
+  auto test = [&](int32_t a, std::vector<int32_t> b, std::vector<int32_t> c) {
+    EXPECT_EQ(b.size(), c.size());
+    auto d = std::make_unique<int32_t[]>(b.size());
+    compute_ptr(a, b.data(), c.data(), d.get(), b.size());
+    for (auto i = 0u; i < b.size(); i++) { EXPECT_EQ(d[i], a * b[i] + c[i]); }
+  };
+
+  test(2, {1, 2, 3, 4, 5, 6}, {11, 12, 13, 14, 15, 16});
+  test(5, {-8, 5, -4, 3, -10, 11}, {0, 8, 3, -9, 4, 2});
+
+  auto gen = std::default_random_engine{std::random_device{}()};
+  auto dist = std::uniform_int_distribution<int32_t>(-10000, 10000);
+
+  auto b = std::vector<int32_t>();
+  auto c = std::vector<int32_t>();
+  std::generate_n(std::back_inserter(b), 1000000, [&] { return dist(gen); });
+  std::generate_n(std::back_inserter(c), 1000000, [&] { return dist(gen); });
+  test(dist(gen), std::move(b), std::move(c));
 }
