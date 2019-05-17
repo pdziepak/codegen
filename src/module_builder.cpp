@@ -53,6 +53,10 @@ module module_builder::build() && {
   return module{compiler_->session_, compiler_->data_layout_};
 }
 
+void module_builder::set_function_attributes(llvm::Function* fn) {
+  fn->addFnAttr("target-cpu", llvm::sys::getHostCPUName());
+}
+
 unsigned module_builder::source_code_generator::add_line(std::string const& line) {
   source_code_ << std::string(indent_, ' ') << line << "\n";
   return line_no_++;

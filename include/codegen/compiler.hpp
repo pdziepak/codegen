@@ -41,6 +41,7 @@ class compiler {
   llvm::orc::ExecutionSession session_;
 
   llvm::DataLayout data_layout_;
+  std::unique_ptr<llvm::TargetMachine> target_machine_;
 
   llvm::orc::RTDyldObjectLinkingLayer object_layer_;
   llvm::orc::IRCompileLayer compile_layer_;
@@ -70,8 +71,8 @@ public:
   void add_symbol(std::string const& name, void* address);
 
 private:
-  static llvm::Expected<llvm::orc::ThreadSafeModule> optimize_module(llvm::orc::ThreadSafeModule,
-                                                                     llvm::orc::MaterializationResponsibility const&);
+  llvm::Expected<llvm::orc::ThreadSafeModule> optimize_module(llvm::orc::ThreadSafeModule,
+                                                              llvm::orc::MaterializationResponsibility const&);
 };
 
 } // namespace codegen

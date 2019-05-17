@@ -25,6 +25,9 @@
 #include <fstream>
 #include <random>
 
+#include <llvm/Analysis/TargetLibraryInfo.h>
+#include <llvm/Analysis/TargetTransformInfo.h>
+
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -47,7 +50,7 @@ static std::string get_process_name() {
 }
 
 compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
-    : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())),
+    : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())), target_machine_(unwrap(tmb.createTargetMachine())),
       object_layer_(
           session_, [] { return std::make_unique<llvm::SectionMemoryManager>(); },
           [this](llvm::orc::VModuleKey vk, llvm::object::ObjectFile const& object,
@@ -56,7 +59,10 @@ compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
             loaded_modules_.emplace_back(vk);
           }),
       compile_layer_(session_, object_layer_, llvm::orc::ConcurrentIRCompiler(std::move(tmb))),
-      optimize_layer_(session_, compile_layer_, optimize_module),
+      optimize_layer_(session_, compile_layer_,
+                      [this](llvm::orc::ThreadSafeModule tsm, llvm::orc::MaterializationResponsibility const& mr) {
+                        return optimize_module(std::move(tsm), mr);
+                      }),
       gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()), source_directory_([&] {
         auto eng = std::default_random_engine{std::random_device{}()};
         auto dist = std::uniform_int_distribution<uint64_t>{};
@@ -106,29 +112,46 @@ compiler::~compiler() {
   std::filesystem::remove_all(source_directory_);
 }
 
-llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc::ThreadSafeModule module,
+llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc::ThreadSafeModule tsm,
                                                                       llvm::orc::MaterializationResponsibility const&) {
-  auto function_passes = llvm::legacy::FunctionPassManager(module.getModule());
+  auto module = tsm.getModule();
+
+  auto target_triple = target_machine_->getTargetTriple();
+
+  module->setDataLayout(data_layout_);
+  module->setTargetTriple(target_triple.str());
+
+  auto library_info = std::make_unique<llvm::TargetLibraryInfoImpl>(target_triple);
+
+  auto function_passes = llvm::legacy::FunctionPassManager(module);
   auto module_passes = llvm::legacy::PassManager();
 
   auto builder = llvm::PassManagerBuilder{};
   builder.OptLevel = 3;
-  builder.PrepareForLTO = true;
+  builder.SizeLevel = 0;
   builder.Inliner = llvm::createFunctionInliningPass();
   builder.MergeFunctions = true;
   builder.LoopVectorize = true;
   builder.SLPVectorize = true;
+  builder.DisableUnrollLoops = false;
+  builder.RerollLoops = true;
+  builder.LibraryInfo = new llvm::TargetLibraryInfoImpl(target_triple);
+
+  function_passes.add(llvm::createTargetTransformInfoWrapperPass(target_machine_->getTargetIRAnalysis()));
+  module_passes.add(llvm::createTargetTransformInfoWrapperPass(target_machine_->getTargetIRAnalysis()));
+
+  target_machine_->adjustPassManager(builder);
 
   builder.populateFunctionPassManager(function_passes);
   builder.populateModulePassManager(module_passes);
 
   function_passes.doInitialization();
-  for (auto& func : *module.getModule()) { function_passes.run(func); }
+  for (auto& func : *module) { function_passes.run(func); }
   function_passes.doFinalization();
 
-  module_passes.run(*module.getModule());
+  module_passes.run(*module);
 
-  return module;
+  return tsm;
 }
 
 void compiler::add_symbol(std::string const& name, void* address) {

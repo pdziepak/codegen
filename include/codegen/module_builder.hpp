@@ -105,6 +105,8 @@ public:
   friend std::ostream& operator<<(std::ostream&, module_builder const&);
 
 private:
+  void set_function_attributes(llvm::Function*);
+
   void declare_external_symbol(std::string const&, void*);
 };
 
@@ -440,6 +442,7 @@ auto module_builder::create_function(std::string const& name, FunctionBuilder&& 
   auto prev_builder = std::exchange(detail::current_builder, this);
   exited_block_ = false;
   auto fn_ref = detail::function_builder<FunctionType>{}(name, fb);
+  set_function_attributes(fn_ref);
   detail::current_builder = prev_builder;
   return fn_ref;
 }
