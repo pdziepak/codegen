@@ -1,0 +1,39 @@
+language: cpp
+dist: xenial
+
+matrix:
+  include:
+    - os: linux
+      compiler: clang
+      addons: &clang
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-xenial-8
+          packages:
+            - g++-8
+            - llvm-8-dev
+            - clang-8
+            - clang++-8
+      env:
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
+        - BUILD_TYPE=Release
+
+    - os: linux
+      compiler: clang
+      addons: *clang
+      env:
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
+        - BUILD_TYPE=Debug
+
+install:
+  - eval "${MATRIX_EVAL}"
+  - mkdir build
+  - cd build
+  - (curl https://codeload.github.com/google/googletest/tar.gz/release-1.8.1 | tar -xzf - && cd googletest-release-1.8.1 && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && sudo make install);
+  - (curl https://codeload.github.com/fmtlib/fmt/tar.gz/5.3.0 | tar -xzf - && cd fmt-5.3.0 && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DFMT_TEST=OFF -DFMT_DOC=OFF && make && sudo make install);
+
+script:
+  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCODEGEN_SANTIZIERS=OFF
+  - make VERBOSE=1
+  - make test
