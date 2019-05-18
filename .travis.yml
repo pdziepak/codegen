@@ -36,6 +36,27 @@ matrix:
         - BUILD_TYPE=Debug
         - CXX_FLAGS=--coverage
 
+    - os: linux
+      compiler: gcc
+      addons: &gcc8
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-xenial-8
+          packages:
+            - g++-8
+            - llvm-8-dev
+      env:
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+        - BUILD_TYPE=Release
+
+    - os: linux
+      compiler: gcc
+      addons: *gcc8
+      env:
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+        - BUILD_TYPE=Debug
+
 install:
   - eval "${MATRIX_EVAL}"
   - mkdir build
