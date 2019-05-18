@@ -15,6 +15,7 @@ matrix:
             - llvm-8-dev
             - clang-8
             - clang++-8
+            - lcov
       env:
         - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
         - BUILD_TYPE=Release
@@ -26,6 +27,15 @@ matrix:
         - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
         - BUILD_TYPE=Debug
 
+    - os: linux
+      compiler: clang
+      addons: *clang
+      env:
+        - COVERAGE=1
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
+        - BUILD_TYPE=Debug
+        - CXX_FLAGS=--coverage
+
 install:
   - eval "${MATRIX_EVAL}"
   - mkdir build
@@ -34,6 +44,17 @@ install:
   - (curl https://codeload.github.com/fmtlib/fmt/tar.gz/5.3.0 | tar -xzf - && cd fmt-5.3.0 && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DFMT_TEST=OFF -DFMT_DOC=OFF && make && sudo make install);
 
 script:
-  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCODEGEN_SANTIZIERS=OFF
+  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCODEGEN_SANTIZIERS=OFF -DCMAKE_CXX_FLAGS=${CXX_FLAGS}
   - make VERBOSE=1
   - make test
+
+after_script:
+  - if [[ "${COVERAGE}" == 1 ]]; then
+      cd ${TRAVIS_BUILD_DIR};
+      echo -e '#!/bin/bash\nexec llvm-cov-8 gcov "$@"' > ${TRAVIS_BUILD_DIR}/llvm-gcov.sh;
+      chmod +x ${TRAVIS_BUILD_DIR}/llvm-gcov.sh;
+      lcov --directory . --capture --output-file coverage.info --gcov-tool ${TRAVIS_BUILD_DIR}/llvm-gcov.sh;
+      lcov --remove coverage.info '/usr/*' --output-file coverage.info;
+      lcov --list coverage.info;
+      bash <(curl -s https://codecov.io/bash) -x ${TRAVIS_BUILD_DIR}/llvm-gcov.sh || echo "Codecov did not collect coverage reports";
+    fi
