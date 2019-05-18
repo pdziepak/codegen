@@ -50,7 +50,7 @@ add_library(codegen
 )
 target_include_directories(codegen PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>)
 target_compile_features(codegen PUBLIC cxx_std_17)
-target_link_options(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
+target_link_libraries(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
 target_compile_options(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
 target_link_libraries(codegen PUBLIC LLVM fmt)
 
