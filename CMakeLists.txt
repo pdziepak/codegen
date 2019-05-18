@@ -29,7 +29,7 @@ include(CTest)
 
 option(CODEGEN_SANTIZIERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer." ON)
 
-list(APPEND CODEGEN_CXX_FLAGS -Wall -Wextra -Werror)
+list(APPEND CODEGEN_CXX_FLAGS -Wall -Wextra -Werror -Wno-unused-parameter)
 if (CODEGEN_SANTIZIERS)
   list(APPEND CODEGEN_CXX_DEBUG_FLAGS -fsanitize=address -fsanitize=address)
 endif()
@@ -48,11 +48,14 @@ add_library(codegen
   src/module_builder.cpp
   src/statements.cpp
 )
-target_include_directories(codegen PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>)
+target_include_directories(codegen PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+  ${LLVM_INCLUDE_DIR}
+)
 target_compile_features(codegen PUBLIC cxx_std_17)
 target_link_libraries(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
 target_compile_options(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
-target_link_libraries(codegen PUBLIC LLVM fmt)
+target_link_libraries(codegen PUBLIC LLVM fmt stdc++fs)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)
