@@ -37,26 +37,13 @@
 namespace cg = codegen;
 using namespace cg::literals;
 
-size_t less_i32(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
-  auto a_val = cg::load(cg::bit_cast<int32_t*>(a_ptr + cg::constant<uint64_t>(off)));
-  auto b_val = cg::load(cg::bit_cast<int32_t*>(b_ptr + cg::constant<uint64_t>(off)));
+template<typename T>
+size_t less_cmp(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
+  auto a_val = cg::load(cg::bit_cast<T*>(a_ptr + cg::constant<uint64_t>(off)));
+  auto b_val = cg::load(cg::bit_cast<T*>(b_ptr + cg::constant<uint64_t>(off)));
   cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
   cg::if_(a_val > b_val, [&] { cg::return_(cg::false_()); });
-  return sizeof(int32_t) + off;
-}
-size_t less_u16(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
-  auto a_val = cg::load(cg::bit_cast<uint16_t*>(a_ptr + cg::constant<uint64_t>(off)));
-  auto b_val = cg::load(cg::bit_cast<uint16_t*>(b_ptr + cg::constant<uint64_t>(off)));
-  cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
-  cg::if_(a_val > b_val, [&] { cg::return_(cg::false_()); });
-  return sizeof(uint16_t) + off;
-}
-size_t less_f32(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
-  auto a_val = cg::load(cg::bit_cast<float*>(a_ptr + cg::constant<uint64_t>(off)));
-  auto b_val = cg::load(cg::bit_cast<float*>(b_ptr + cg::constant<uint64_t>(off)));
-  cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
-  cg::if_(a_val > b_val, [&] { cg::return_(cg::false_()); });
-  return sizeof(float) + off;
+  return sizeof(T) + off;
 }
 
 TEST(examples, tuple_i32f32u16_less) {
@@ -65,9 +52,9 @@ TEST(examples, tuple_i32f32u16_less) {
   auto less = builder.create_function<bool(std::byte*, std::byte*)>(
       "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
         size_t offset = 0;
-        offset = less_i32(a_ptr, b_ptr, offset);
-        offset = less_f32(a_ptr, b_ptr, offset);
-        offset = less_u16(a_ptr, b_ptr, offset);
+        offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
+        offset = less_cmp<float>(a_ptr, b_ptr, offset);
+        offset = less_cmp<uint16_t>(a_ptr, b_ptr, offset);
         (void)offset;
         cg::return_(cg::false_());
       });
@@ -106,7 +93,7 @@ TEST(examples, tuple_i32str_less) {
   auto less = builder.create_function<bool(std::byte*, std::byte*)>(
       "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
         size_t offset = 0;
-        offset = less_i32(a_ptr, b_ptr, offset);
+        offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
 
         auto a_len = cg::load(cg::bit_cast<uint32_t*>(a_ptr + cg::constant<uint64_t>(offset)));
         auto b_len = cg::load(cg::bit_cast<uint32_t*>(b_ptr + cg::constant<uint64_t>(offset)));
