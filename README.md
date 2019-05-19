@@ -94,33 +94,20 @@ auto silly_function2 = builder.create_function<unsigned(unsigned)>("silly_functi
 ### Tuple comparator
 
 
-In this example, let's consider tuples which element's types are known only at run-time. If the goal is to write a less-comparator for such tuples, the naive approach would be to have a virtual function call for each element. That is far from ideal if the actual comparison is very cheap, e.g. the elements are integers. With CodeGen, we can do better. First, let's write comparators for individual types:
+In this example, let's consider tuples which element's types are known only at run-time. If the goal is to write a less-comparator for such tuples, the naive approach would be to have a virtual function call for each element. That is far from ideal if the actual comparison is very cheap, e.g. the elements are integers. With CodeGen, we can do better. First, let's write a comparator for an element of a fundamental type:
 
 ```c++
-size_t less_i32(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
-  auto a_val = cg::load(cg::bit_cast<int32_t*>(a_ptr + cg::constant<uint64_t>(off)));
-  auto b_val = cg::load(cg::bit_cast<int32_t*>(b_ptr + cg::constant<uint64_t>(off)));
+template<typename T>
+size_t less_cmp(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
+  auto a_val = cg::load(cg::bit_cast<T*>(a_ptr + cg::constant<uint64_t>(off)));
+  auto b_val = cg::load(cg::bit_cast<T*>(b_ptr + cg::constant<uint64_t>(off)));
   cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
   cg::if_(a_val > b_val, [&] { cg::return_(cg::false_()); });
-  return sizeof(int32_t) + off;
-}
-size_t less_u16(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
-  auto a_val = cg::load(cg::bit_cast<uint16_t*>(a_ptr + cg::constant<uint64_t>(off)));
-  auto b_val = cg::load(cg::bit_cast<uint16_t*>(b_ptr + cg::constant<uint64_t>(off)));
-  cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
-  cg::if_(a_val > b_val, [&] { cg::return_(cg::false_()); });
-  return sizeof(uint16_t) + off;
-}
-size_t less_f32(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
-  auto a_val = cg::load(cg::bit_cast<float*>(a_ptr + cg::constant<uint64_t>(off)));
-  auto b_val = cg::load(cg::bit_cast<float*>(b_ptr + cg::constant<uint64_t>(off)));
-  cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
-  cg::if_(a_val > b_val, [&] { cg::return_(cg::false_()); });
-  return sizeof(float) + off;
+  return sizeof(T) + off;
 }
 ```
 
-Those lambdas generate comparison code for `int32_t`, `uint16_t` and `float`, respectively. The arguments are pointers to buffers containing both tuples and an offset at which the element is located. The return value is the offset of the next element.
+This function template generates comparison code for any fundamental type. The arguments are pointers to buffers containing both tuples and an offset at which the element is located. The return value is the offset of the next element.
 
 Now, let's say we want to generate a less-comparator for `tuple<i32, float, u16>`.
 
@@ -128,9 +115,9 @@ Now, let's say we want to generate a less-comparator for `tuple<i32, float, u16>
   auto less = builder.create_function<bool(std::byte*, std::byte*)>(
       "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
         size_t offset = 0;
-        offset = less_i32(a_ptr, b_ptr, offset);
-        offset = less_f32(a_ptr, b_ptr, offset);
-        offset = less_u16(a_ptr, b_ptr, offset);
+        offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
+        offset = less_cmp<float>(a_ptr, b_ptr, offset);
+        offset = less_cmp<uint16_t>(a_ptr, b_ptr, offset);
         (void)offset;
         cg::return_(cg::false_());
       });
@@ -220,7 +207,7 @@ A more complicated example would be if one of the tuple elements was an ASCII st
   auto less = builder.create_function<bool(std::byte*, std::byte*)>(
       "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
         size_t offset = 0;
-        offset = less_i32(a_ptr, b_ptr, offset);
+        offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
 
         auto a_len = cg::load(cg::bit_cast<uint32_t*>(a_ptr + cg::constant<uint64_t>(offset)));
         auto b_len = cg::load(cg::bit_cast<uint32_t*>(b_ptr + cg::constant<uint64_t>(offset)));
