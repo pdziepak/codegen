@@ -182,3 +182,37 @@ TEST(examples, soa_compute) {
   std::generate_n(std::back_inserter(c), 1000000, [&] { return dist(gen); });
   test(dist(gen), std::move(b), std::move(c));
 }
+
+TEST(examples, trivial_if) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "trivial_if");
+  auto silly_function = builder.create_function<bool(bool)>("silly_function", [](cg::value<bool> is_true) {
+    cg::if_(
+        is_true, [] { cg::return_(cg::true_()); }, [] { cg::return_(cg::false_()); });
+  });
+  auto module = std::move(builder).build();
+  auto fn = module.get_address(silly_function);
+  EXPECT_TRUE(fn(true));
+  EXPECT_FALSE(fn(false));
+}
+
+TEST(examples, trivial_while) {
+  auto comp = codegen::compiler{};
+  auto builder = codegen::module_builder(comp, "trivial_while");
+auto silly_function2 = builder.create_function<unsigned(unsigned)>("silly_function2",
+    [](cg::value<unsigned> target) {
+      auto var = cg::variable<unsigned>("var", cg::constant<unsigned>(0));
+      cg::while_([&] { return var.get() < target; },
+        [&] {
+          var.set(var.get() + cg::constant<unsigned>(1));
+        });
+      cg::return_(var.get());
+    });
+  auto module = std::move(builder).build();
+  auto fn = module.get_address(silly_function2);
+  EXPECT_EQ(fn(0), 0);
+  EXPECT_EQ(fn(1), 1);
+  EXPECT_EQ(fn(7), 7);
+  EXPECT_EQ(fn(100), 100);
+  EXPECT_EQ(fn(123), 123);
+}
