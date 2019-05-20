@@ -65,7 +65,7 @@ install:
   - (curl https://codeload.github.com/fmtlib/fmt/tar.gz/5.3.0 | tar -xzf - && cd fmt-5.3.0 && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DFMT_TEST=OFF -DFMT_DOC=OFF && make && sudo make install);
 
 script:
-  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCODEGEN_SANTIZIERS=OFF -DCMAKE_CXX_FLAGS=${CXX_FLAGS}
+  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCODEGEN_SANITIZERS=OFF -DCMAKE_CXX_FLAGS=${CXX_FLAGS}
   - make VERBOSE=1
   - make test
 

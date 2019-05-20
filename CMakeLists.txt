@@ -27,10 +27,10 @@ project(codegen
 
 include(CTest)
 
-option(CODEGEN_SANTIZIERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer." ON)
+option(CODEGEN_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer." ON)
 
 list(APPEND CODEGEN_CXX_FLAGS -Wall -Wextra -Werror -Wno-unused-parameter)
-if (CODEGEN_SANTIZIERS)
+if (CODEGEN_SANITIZERS)
   list(APPEND CODEGEN_CXX_DEBUG_FLAGS -fsanitize=address -fsanitize=address)
 endif()
 
