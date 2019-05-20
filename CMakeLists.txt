@@ -31,7 +31,7 @@ option(CODEGEN_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSani
 
 list(APPEND CODEGEN_CXX_FLAGS -Wall -Wextra -Werror -Wno-unused-parameter)
 if (CODEGEN_SANITIZERS)
-  list(APPEND CODEGEN_CXX_DEBUG_FLAGS -fsanitize=address -fsanitize=address)
+  list(APPEND CODEGEN_CXX_DEBUG_FLAGS -fsanitize=address -fsanitize=undefined)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
