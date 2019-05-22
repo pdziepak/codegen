@@ -224,10 +224,10 @@ template<> struct type<double> {
 template<typename Type> struct type<Type*> {
   static constexpr size_t alignment = alignof(Type*);
   static llvm::DIType* dbg() {
-    return current_builder->dbg_builder_.createPointerType(type<Type>::dbg(), sizeof(Type*) * 8);
+    return current_builder->dbg_builder_.createPointerType(type<std::remove_cv_t<Type>>::dbg(), sizeof(Type*) * 8);
   }
-  static llvm::Type* llvm() { return type<Type>::llvm()->getPointerTo(); }
-  static std::string name() { return type<Type>::name() + '*'; }
+  static llvm::Type* llvm() { return type<std::remove_cv_t<Type>>::llvm()->getPointerTo(); }
+  static std::string name() { return type<std::remove_cv_t<Type>>::name() + '*'; }
 };
 
 template<typename Type> std::enable_if_t<std::is_arithmetic_v<Type>, llvm::Value*> get_constant(Type v) {
@@ -249,6 +249,9 @@ template<typename Type> class value {
   std::string name_;
 
 public:
+  static_assert(!std::is_const_v<Type>);
+  static_assert(!std::is_volatile_v<Type>);
+
   explicit value(llvm::Value* v, std::string const& n) : value_(v), name_(n) {}
 
   value(value const&) = default;

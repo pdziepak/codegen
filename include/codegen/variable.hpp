@@ -31,6 +31,9 @@ template<typename Type> class variable {
   std::string name_;
 
 public:
+  static_assert(!std::is_const_v<Type>);
+  static_assert(!std::is_volatile_v<Type>);
+
   explicit variable(std::string const& n) : name_(n) {
     auto& mb = *detail::current_builder;
 

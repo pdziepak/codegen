@@ -142,7 +142,7 @@ value<ReturnType> call(function_ref<ReturnType, Arguments...> const& fn, Values&
 
 template<typename Pointer, typename = std::enable_if_t<std::is_pointer_v<typename std::decay_t<Pointer>::value_type>>>
 auto load(Pointer ptr) {
-  using value_type = std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>;
+  using value_type = std::remove_cv_t<std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>>;
   auto& mb = *detail::current_builder;
 
   auto id = fmt::format("val{}", detail::id_counter++);
@@ -160,10 +160,12 @@ auto load(Pointer ptr) {
   return value<value_type>{v, id};
 }
 
-template<typename Value, typename Pointer,
-         typename = std::enable_if_t<std::is_pointer_v<typename std::decay_t<Pointer>::value_type> &&
-                                     std::is_same_v<typename std::decay_t<Value>::value_type,
-                                                    std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>>>>
+template<
+    typename Value, typename Pointer,
+    typename = std::enable_if_t<std::is_pointer_v<typename std::decay_t<Pointer>::value_type> &&
+                                !std::is_const_v<std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>> &&
+                                std::is_same_v<typename std::decay_t<Value>::value_type,
+                                               std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>>>>
 void store(Value v, Pointer ptr) {
   using value_type = std::remove_pointer_t<typename std::decay_t<Pointer>::value_type>;
   auto& mb = *detail::current_builder;
