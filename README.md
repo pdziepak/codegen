@@ -355,6 +355,34 @@ CodeGen configures LLVM so that it takes advantage of the features available on 
    0x00007fffefd2721a <+538>:    je     0x7fffefd2726d <compute+621>
 ```
 
+At the moment, CodeGen doesn't need to know anything about the ABI or the hardware architecture, which means that it can easily support all compilation targets that LLVM does. Below is the core part of the same loop compiled for aarch64 Cortex-A53.
+
+```
+5	        val10 = *(arg1 + idx)
+   0x0000007fb050e070 <+112>:	ldp	q1, q2, [x9, #-16]
+
+6	        val11 = *(arg2 + idx)
+   0x0000007fb050e074 <+116>:	ldp	q3, q4, [x10, #-16]
+
+8	        idx = (idx + 1);
+   0x0000007fb050e078 <+120>:	add	x9, x9, #0x20
+   0x0000007fb050e07c <+124>:	add	x10, x10, #0x20
+
+7	        *(arg3 + idx) = ((arg0 * val10) + val11)
+   0x0000007fb050e080 <+128>:	mla	v3.4s, v1.4s, v0.4s
+
+8	        idx = (idx + 1);
+   0x0000007fb050e084 <+132>:	subs	x12, x12, #0x8
+
+7	        *(arg3 + idx) = ((arg0 * val10) + val11)
+   0x0000007fb050e088 <+136>:	mla	v4.4s, v2.4s, v0.4s
+   0x0000007fb050e08c <+140>:	stp	q3, q4, [x11, #-16]
+
+8	        idx = (idx + 1);
+   0x0000007fb050e090 <+144>:	add	x11, x11, #0x20
+   0x0000007fb050e094 <+148>:	b.ne	0x7fb050e070 <compute+112>  // b.any
+```
+
 ## TODO
 
 * Support for aggregate types. This requires CodeGen to be aware of the ABI and would benefit if C++ had any form of static reflection.
