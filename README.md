@@ -98,7 +98,7 @@ In this example, let's consider tuples which element's types are known only at r
 
 ```c++
 template<typename T>
-size_t less_cmp(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
+size_t less_cmp(cg::value<std::byte const*> a_ptr, cg::value<std::byte const*> b_ptr, size_t off) {
   auto a_val = cg::load(cg::bit_cast<T*>(a_ptr + cg::constant<uint64_t>(off)));
   auto b_val = cg::load(cg::bit_cast<T*>(b_ptr + cg::constant<uint64_t>(off)));
   cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
@@ -112,8 +112,8 @@ This function template generates comparison code for any fundamental type. The a
 Now, let's say we want to generate a less-comparator for `tuple<i32, float, u16>`.
 
 ```c++
-  auto less = builder.create_function<bool(std::byte*, std::byte*)>(
-      "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
+  auto less = builder.create_function<bool(std::byte const*, std::byte const*)>(
+      "less", [&](cg::value<std::byte const*> a_ptr, cg::value<std::byte const*> b_ptr) {
         size_t offset = 0;
         offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
         offset = less_cmp<float>(a_ptr, b_ptr, offset);
@@ -204,8 +204,8 @@ less (arg0=0x60200001c7b0 "", arg1=0x60200001c790 "\001") at /tmp/examples-11076
 A more complicated example would be if one of the tuple elements was an ASCII string. The following code generates a comparator for `tuple<i32, string>` assuming that a string is serialised in the form of `<length:u32><bytes...>`:
 
 ```c++
-  auto less = builder.create_function<bool(std::byte*, std::byte*)>(
-      "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
+  auto less = builder.create_function<bool(std::byte const*, std::byte const*)>(
+      "less", [&](cg::value<std::byte const*> a_ptr, cg::value<std::byte const*> b_ptr) {
         size_t offset = 0;
         offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
 
@@ -304,8 +304,8 @@ As we can see, LLVM has inlined calls to `min`. `memcmp` is an external function
 In the previous example, we knew the computations that we wanted to perform but didn't know the data. Let's now look at the opposite situation. The data organised as a structure of arrays, but we don't know ahead of time what arithmetic operations the application will need to execute. How the information about the desired computations is represented is out of the scope of CodeGen, though we may suspect an abstract syntax tree being involved there. The application would have to translate that to appropriate calls to CodeGen. For example, if for a value `a` and arrays `b` and `c` we wanted to compute `d[i] = a * b[i] + c[i]` it could be achieved by the code like this:
 
 ```c++
-  auto compute = builder.create_function<void(int32_t, int32_t*, int32_t*, int32_t*, uint64_t)>(
-      "compute", [&](cg::value<int32_t> a, cg::value<int32_t*> b_ptr, cg::value<int32_t*> c_ptr,
+  auto compute = builder.create_function<void(int32_t, int32_t const*, int32_t const*, int32_t*, uint64_t)>(
+      "compute", [&](cg::value<int32_t> a, cg::value<int32_t const*> b_ptr, cg::value<int32_t const*> c_ptr,
                      cg::value<int32_t*> d_ptr, cg::value<uint64_t> n) {
         auto idx = cg::variable<uint64_t>("idx", 0_u64);
         cg::while_([&] { return idx.get() < n; },

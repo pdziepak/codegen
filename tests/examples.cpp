@@ -38,7 +38,7 @@ namespace cg = codegen;
 using namespace cg::literals;
 
 template<typename T>
-size_t less_cmp(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t off) {
+size_t less_cmp(cg::value<std::byte const*> a_ptr, cg::value<std::byte const*> b_ptr, size_t off) {
   auto a_val = cg::load(cg::bit_cast<T*>(a_ptr + cg::constant<uint64_t>(off)));
   auto b_val = cg::load(cg::bit_cast<T*>(b_ptr + cg::constant<uint64_t>(off)));
   cg::if_(a_val < b_val, [&] { cg::return_(cg::true_()); });
@@ -49,8 +49,8 @@ size_t less_cmp(cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr, size_t
 TEST(examples, tuple_i32f32u16_less) {
   auto comp = codegen::compiler{};
   auto builder = codegen::module_builder(comp, "tuple_i32f32u16_less");
-  auto less = builder.create_function<bool(std::byte*, std::byte*)>(
-      "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
+  auto less = builder.create_function<bool(std::byte const*, std::byte const*)>(
+      "less", [&](cg::value<std::byte const*> a_ptr, cg::value<std::byte const*> b_ptr) {
         size_t offset = 0;
         offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
         offset = less_cmp<float>(a_ptr, b_ptr, offset);
@@ -90,8 +90,8 @@ TEST(examples, tuple_i32str_less) {
         cg::return_(b);
       });
 
-  auto less = builder.create_function<bool(std::byte*, std::byte*)>(
-      "less", [&](cg::value<std::byte*> a_ptr, cg::value<std::byte*> b_ptr) {
+  auto less = builder.create_function<bool(std::byte const*, std::byte const*)>(
+      "less", [&](cg::value<std::byte const*> a_ptr, cg::value<std::byte const*> b_ptr) {
         size_t offset = 0;
         offset = less_cmp<int32_t>(a_ptr, b_ptr, offset);
 
@@ -133,8 +133,8 @@ TEST(examples, tuple_i32str_less) {
 TEST(examples, soa_compute) {
   auto comp = codegen::compiler{};
   auto builder = codegen::module_builder(comp, "soa_compute");
-  auto compute = builder.create_function<void(int32_t, int32_t*, int32_t*, int32_t*, uint64_t)>(
-      "compute", [&](cg::value<int32_t> a, cg::value<int32_t*> b_ptr, cg::value<int32_t*> c_ptr,
+  auto compute = builder.create_function<void(int32_t, int32_t const*, int32_t const*, int32_t*, uint64_t)>(
+      "compute", [&](cg::value<int32_t> a, cg::value<int32_t const*> b_ptr, cg::value<int32_t const*> c_ptr,
                      cg::value<int32_t*> d_ptr, cg::value<uint64_t> n) {
         auto idx = cg::variable<uint64_t>("idx", 0_u64);
         cg::while_([&] { return idx.get() < n; },
@@ -150,7 +150,7 @@ TEST(examples, soa_compute) {
   auto compute_ptr = module.get_address(compute);
   compute_ptr(0, nullptr, nullptr, nullptr, 0);
 
-  auto test = [&](int32_t a, std::vector<int32_t> b, std::vector<int32_t> c) {
+  auto test = [&](int32_t a, std::vector<int32_t> const& b, std::vector<int32_t> const& c) {
     EXPECT_EQ(b.size(), c.size());
     auto d = std::make_unique<int32_t[]>(b.size());
     compute_ptr(a, b.data(), c.data(), d.get(), b.size());
