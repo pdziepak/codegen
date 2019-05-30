@@ -45,13 +45,13 @@ namespace codegen {
 
 compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
     : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())), target_machine_(unwrap(tmb.createTargetMachine())),
-      object_layer_(
-          session_, [] { return std::make_unique<llvm::SectionMemoryManager>(); },
-          [this](llvm::orc::VModuleKey vk, llvm::object::ObjectFile const& object,
-                 llvm::RuntimeDyld::LoadedObjectInfo const& info) {
-            if (gdb_listener_) { gdb_listener_->notifyObjectLoaded(vk, object, info); }
-            loaded_modules_.emplace_back(vk);
-          }),
+      mangle_(session_, data_layout_), object_layer_(
+                                           session_, [] { return std::make_unique<llvm::SectionMemoryManager>(); },
+                                           [this](llvm::orc::VModuleKey vk, llvm::object::ObjectFile const& object,
+                                                  llvm::RuntimeDyld::LoadedObjectInfo const& info) {
+                                             if (gdb_listener_) { gdb_listener_->notifyObjectLoaded(vk, object, info); }
+                                             loaded_modules_.emplace_back(vk);
+                                           }),
       compile_layer_(session_, object_layer_, llvm::orc::ConcurrentIRCompiler(std::move(tmb))),
       optimize_layer_(session_, compile_layer_,
                       [this](llvm::orc::ThreadSafeModule tsm, llvm::orc::MaterializationResponsibility const& mr) {
@@ -146,7 +146,7 @@ llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc:
 }
 
 void compiler::add_symbol(std::string const& name, void* address) {
-  external_symbols_[name] = reinterpret_cast<uintptr_t>(address);
+  external_symbols_[*mangle_(name)] = reinterpret_cast<uintptr_t>(address);
 }
 
 module::module(llvm::orc::ExecutionSession& session, llvm::DataLayout const& dl)
