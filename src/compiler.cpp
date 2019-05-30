@@ -22,7 +22,8 @@
 
 #include "codegen/compiler.hpp"
 
-#include <fstream>
+#include "os.hpp"
+
 #include <random>
 
 #include <llvm/Analysis/TargetLibraryInfo.h>
@@ -41,13 +42,6 @@
 #include "codegen/module.hpp"
 
 namespace codegen {
-
-static std::string get_process_name() {
-  auto ifs = std::ifstream("/proc/self/comm");
-  auto str = std::string{};
-  std::getline(ifs, str);
-  return str;
-}
 
 compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
     : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())), target_machine_(unwrap(tmb.createTargetMachine())),
