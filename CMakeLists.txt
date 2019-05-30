@@ -60,7 +60,7 @@ target_include_directories(codegen PUBLIC
 target_compile_features(codegen PUBLIC cxx_std_17)
 target_link_libraries(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
 target_compile_options(codegen PRIVATE ${CODEGEN_CXX_FLAGS})
-target_link_libraries(codegen PUBLIC LLVM fmt ${CODEGEN_CXX_FILESYSTEM})
+target_link_libraries(codegen PUBLIC LLVM fmt::fmt ${CODEGEN_CXX_FILESYSTEM})
 
 if(BUILD_TESTING)
   add_subdirectory(tests)
