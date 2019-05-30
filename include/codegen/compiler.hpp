@@ -23,6 +23,7 @@
 #pragma once
 
 #include <filesystem>
+#include <unordered_map>
 
 #include <llvm/ExecutionEngine/JITEventListener.h>
 
