@@ -48,6 +48,10 @@ module module_builder::build() && {
 
   dbg_builder_.finalize();
 
+  auto target_triple = compiler_->target_machine_->getTargetTriple();
+  module_->setDataLayout(compiler_->data_layout_);
+  module_->setTargetTriple(target_triple.str());
+
   throw_on_error(compiler_->optimize_layer_.add(compiler_->session_.getMainJITDylib(),
                                                 llvm::orc::ThreadSafeModule(std::move(module_), std::move(context_))));
   return module{compiler_->session_, compiler_->data_layout_};

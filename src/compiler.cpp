@@ -118,9 +118,6 @@ llvm::Expected<llvm::orc::ThreadSafeModule> compiler::optimize_module(llvm::orc:
 
   auto target_triple = target_machine_->getTargetTriple();
 
-  module->setDataLayout(data_layout_);
-  module->setTargetTriple(target_triple.str());
-
   auto library_info = std::make_unique<llvm::TargetLibraryInfoImpl>(target_triple);
 
   auto function_passes = llvm::legacy::FunctionPassManager(module);
