@@ -39,6 +39,8 @@
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
+#include <llvm/IR/LegacyPassManager.h>
+
 #include "codegen/module.hpp"
 
 namespace codegen {
@@ -46,23 +48,25 @@ namespace codegen {
 compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
     : data_layout_(unwrap(tmb.getDefaultDataLayoutForTarget())), target_machine_(unwrap(tmb.createTargetMachine())),
       mangle_(session_, data_layout_), object_layer_(
-                                           session_, [] { return std::make_unique<llvm::SectionMemoryManager>(); },
-                                           [this](llvm::orc::VModuleKey vk, llvm::object::ObjectFile const& object,
-                                                  llvm::RuntimeDyld::LoadedObjectInfo const& info) {
-                                             if (gdb_listener_) { gdb_listener_->notifyObjectLoaded(vk, object, info); }
-                                             loaded_modules_.emplace_back(vk);
-                                           }),
+                                           session_, [] { return std::make_unique<llvm::SectionMemoryManager>(); }),
       compile_layer_(session_, object_layer_, llvm::orc::ConcurrentIRCompiler(std::move(tmb))),
       optimize_layer_(session_, compile_layer_,
                       [this](llvm::orc::ThreadSafeModule tsm, llvm::orc::MaterializationResponsibility const& mr) {
                         return optimize_module(std::move(tsm), mr);
                       }),
-      gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()), source_directory_([&] {
+      gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()), source_directory_([] {
         auto eng = std::default_random_engine{std::random_device{}()};
         auto dist = std::uniform_int_distribution<uint64_t>{};
         return std::filesystem::temp_directory_path() / (get_process_name() + "-" + std::to_string(dist(eng)));
       }()),
-      dynlib_generator_(unwrap(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(data_layout_))) {
+      dynlib_generator_(unwrap(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(data_layout_.getGlobalPrefix())))
+{
+  object_layer_.setNotifyLoaded([&](llvm::orc::VModuleKey vk, llvm::object::ObjectFile const& object,llvm::RuntimeDyld::LoadedObjectInfo const& info) {
+    if (gdb_listener_) {
+      gdb_listener_->notifyObjectLoaded(vk, object, info);
+    }
+    loaded_modules_.emplace_back(vk);
+  });
   session_.getMainJITDylib().setGenerator([this](llvm::orc::JITDylib& jd,
                                                  llvm::orc::SymbolNameSet const& Names) -> llvm::orc::SymbolNameSet {
     auto added = llvm::orc::SymbolNameSet{};
@@ -81,7 +85,9 @@ compiler::compiler(llvm::orc::JITTargetMachineBuilder tmb)
     throw_on_error(jd.define(llvm::orc::absoluteSymbols(std::move(new_symbols))));
     if (!remaining.empty()) {
       auto dynlib_added = dynlib_generator_(jd, remaining);
-      added.insert(dynlib_added.begin(), dynlib_added.end());
+      if (dynlib_added) { //TODO: proper error handling, this just ignores the error
+        added.insert(dynlib_added.get().begin(), dynlib_added.get().end());
+      }
     }
     return added;
   });
