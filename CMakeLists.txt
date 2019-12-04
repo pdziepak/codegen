@@ -45,7 +45,7 @@ if(APPLE)
   set(CODEGEN_CXX_FILESYSTEM c++fs)
 endif()
 
-find_package(LLVM 8 REQUIRED)
+find_package(LLVM 9 REQUIRED)
 find_package(fmt REQUIRED)
 
 add_library(codegen
